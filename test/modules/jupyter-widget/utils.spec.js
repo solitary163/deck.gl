@@ -1,6 +1,7 @@
+/* global window, console */
 // Copyright (c) Jupyter Development Team.
 // Distributed under the terms of the Modified BSD License.
-/* eslint-disable no-console, no-undef */
+/* eslint-disable import/namespace */
 
 import * as widgets from '@jupyter-widgets/base';
 
@@ -52,14 +53,16 @@ export class DummyManager extends widgets.ManagerBase {
     // TODO: return an html element
     return Promise.resolve(view).then(v => {
       this.el.appendChild(v.el);
-      v.on('remove', () => console.log('view removed', v));
+      v.on('remove', () => console.log('view removed', v)); //eslint-disable-line
       return v.el;
     });
   }
 
   loadClass(className, moduleName, moduleVersion) {
     if (moduleName === '@jupyter-widgets/base') {
+      // eslint-disable-next-line import/namespace
       if (widgets[className]) {
+        // eslint-disable-next-line import/namespace
         return Promise.resolve(widgets[className]);
       }
       return Promise.reject(`Cannot find class ${className}`);
@@ -88,6 +91,5 @@ export function createTestModel(constructor, attributes) {
     widget_manager,
     model_id: id
   };
-
   return new constructor(attributes, modelOptions);
 }

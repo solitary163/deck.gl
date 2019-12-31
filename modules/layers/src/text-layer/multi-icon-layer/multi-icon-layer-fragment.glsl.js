@@ -26,36 +26,48 @@ precision highp float;
 uniform sampler2D iconsTexture;
 uniform float buffer;
 uniform bool sdf;
+uniform float alphaCutoff;
+uniform bool shouldDrawBackground;
+uniform vec3 backgroundColor;
 
 varying vec4 vColor;
 varying vec2 vTextureCoords;
 varying float vGamma;
-
-const float MIN_ALPHA = 0.05;
+varying vec2 uv;
 
 void main(void) {
-  vec4 texColor = texture2D(iconsTexture, vTextureCoords);
-  
-  float alpha = texColor.a;
+  geometry.uv = uv;
+
+  float alpha = texture2D(iconsTexture, vTextureCoords).a;
+
   // if enable sdf (signed distance fields)
   if (sdf) {
-    float distance = texture2D(iconsTexture, vTextureCoords).a;
-    alpha = smoothstep(buffer - vGamma, buffer + vGamma, distance);
+    alpha = smoothstep(buffer - vGamma, buffer + vGamma, alpha);
   }
 
   // Take the global opacity and the alpha from vColor into account for the alpha component
   float a = alpha * vColor.a;
-
-  if (a < MIN_ALPHA) {
-    discard;
+  
+  if (a < alphaCutoff) {
+    // We are now in the background, let's decide what to draw
+    if (shouldDrawBackground && !picking_uActive) {
+      // draw background color and return if not picking
+      gl_FragColor = vec4(backgroundColor, vColor.a);
+      return;
+    } else if (!picking_uActive) {
+      // no background and no picking
+      discard;
+    }
+    // else (picking):
+    // allow picking to work and pick the background (fall-through to DECKGL_FILTER_COLOR)
   }
 
-  gl_FragColor = vec4(vColor.rgb, a);
+  if (shouldDrawBackground) {
+    gl_FragColor = vec4(mix(backgroundColor, vColor.rgb, alpha), vColor.a);
+  } else {
+    gl_FragColor = vec4(vColor.rgb, a);
+  }
 
-  // use highlight color if this fragment belongs to the selected object.
-  gl_FragColor = picking_filterHighlightColor(gl_FragColor);
-
-  // use picking color if rendering to picking FBO.
-  gl_FragColor = picking_filterPickingColor(gl_FragColor);
+  DECKGL_FILTER_COLOR(gl_FragColor, geometry);
 }
 `;

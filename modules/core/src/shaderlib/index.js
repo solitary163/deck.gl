@@ -18,27 +18,34 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
-import {registerShaderModules, setDefaultShaderModules} from '@luma.gl/core';
-import {fp32, fp64, picking, gouraudlighting, phonglighting} from '@luma.gl/core';
-import project from '../shaderlib/project/project';
-import project32 from '../shaderlib/project32/project32';
-import project64 from '../shaderlib/project64/project64';
+import {ProgramManager} from '@luma.gl/core';
+import {gouraudLighting, phongLighting} from '@luma.gl/core';
+import geometry from './misc/geometry';
+import project from './project/project';
+import project32 from './project32/project32';
+import shadow from './shadow/shadow';
+import picking from './picking/picking';
 
-export function initializeShaderModules() {
-  registerShaderModules([
-    fp32,
-    fp64,
-    project,
-    project32,
-    project64,
-    gouraudlighting,
-    phonglighting,
-    picking
-  ]);
+const DEFAULT_MODULES = [geometry, project];
 
-  setDefaultShaderModules([project]);
+const SHADER_HOOKS = [
+  'vs:DECKGL_FILTER_SIZE(inout vec3 size, VertexGeometry geometry)',
+  'vs:DECKGL_FILTER_GL_POSITION(inout vec4 position, VertexGeometry geometry)',
+  'vs:DECKGL_FILTER_COLOR(inout vec4 color, VertexGeometry geometry)',
+  'fs:DECKGL_FILTER_COLOR(inout vec4 color, FragmentGeometry geometry)'
+];
+
+export function createProgramManager(gl) {
+  const programManager = ProgramManager.getDefaultProgramManager(gl);
+
+  for (const shaderModule of DEFAULT_MODULES) {
+    programManager.addDefaultModule(shaderModule);
+  }
+  for (const shaderHook of SHADER_HOOKS) {
+    programManager.addShaderHook(shaderHook);
+  }
+
+  return programManager;
 }
 
-initializeShaderModules();
-
-export {fp32, fp64, picking, project, project64, gouraudlighting, phonglighting};
+export {picking, project, project32, gouraudLighting, phongLighting, shadow};

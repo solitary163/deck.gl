@@ -48,8 +48,8 @@
 }
 
 #banner {
-  background: $black-20;
-  color: $white;
+  background: $white;
+  color: $black-20;
   position: relative;
   @include venderPrefix(user-select, none);
 
@@ -70,15 +70,16 @@
 
   p {
     font-size: 16px;
-    color: $white-40;
+    color: $black-40;
   }
   .btn {
-    border: solid 2px $primary;
-    @include linearGradientH(border-image, $primary, $secondary);
-    border-image-slice: 2;
+    text-transform: none;
+    font-size: 16px;
+    color: $white;
+    background: $black;
   }
   .btn:hover {
-    background: rgba(0, 173, 230, 0.3);
+    background: $black-40;
   }
 }
 
@@ -97,7 +98,7 @@
     right: 0;
     z-index: -1;
     border-top: solid 200px transparent;
-    background-image: url(../static/images/maps.jpg);
+    background-image: url('../images/maps.jpg');
     background-size: contain;
     background-repeat: no-repeat;
     background-position: right top;
@@ -138,7 +139,7 @@
   }
 }
 #footer {
-  background-image: url('../static/images/footer-pattern.gif');
+  background-image: url('../images/footer-pattern.gif');
   background-size: 32px;
   background-repeat: repeat;
   color: $white;
@@ -179,5 +180,8 @@
       padding: 0 24px;
       width: auto;
     }
+  }
+  .floater {
+    display: none;
   }
 }

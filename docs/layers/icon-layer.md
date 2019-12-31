@@ -2,20 +2,19 @@
 
 <p class="badges">
   <img src="https://img.shields.io/badge/@deck.gl/layers-lightgrey.svg?style=flat-square" alt="@deck.gl/layers" />
-  <img src="https://img.shields.io/badge/fp64-yes-blue.svg?style=flat-square" alt="64-bit" />
 </p>
 
 # IconLayer
 
 The Icon Layer renders raster icons at given coordinates.
 
-There are two approaches to load icons. You can pre-generated a sprite image (`iconAtlas`), which packs all your icons 
+There are two approaches to load icons. You can pre-generated a sprite image (`iconAtlas`), which packs all your icons
 into one layout, and a JSON descriptor (`iconMapping`), which describes the position and size of each icon in the `iconAtlas`.
-You can create sprite images with tools such as [TexturePacker](https://www.codeandweb.com/texturepacker). This is the 
-most efficient way to load icons. 
- 
+You can create sprite images with tools such as [TexturePacker](https://www.codeandweb.com/texturepacker). This is the
+most efficient way to load icons.
+
 It is also possible to ask `IconLayer` to generate `iconAtlas` dynamically. This is slower but might be useful in certain
-use cases. 
+use cases.
 
 ## Example: pre-packed iconAtlas
 
@@ -64,10 +63,10 @@ const App = ({data, viewport}) => {
 
 ## Example: auto packing iconAtlas
 
-In some use cases, it is not possible to know the icons that will be used. Instead, each icon needs to be fetched from 
-a programmatically generated URL at runtime. For example, if you want to visualize avatars of github contributors for 
-a project on a map, it is not convenient for you to generate the `iconAtlas` with all the contributors' avatars. 
-In this case, you can follow the example. Auto packing icons is less efficient than pre-packed. 
+In some use cases, it is not possible to know the icons that will be used. Instead, each icon needs to be fetched from
+a programmatically generated URL at runtime. For example, if you want to visualize avatars of github contributors for
+a project on a map, it is not convenient for you to generate the `iconAtlas` with all the contributors' avatars.
+In this case, you can follow the example. Auto packing icons is less efficient than pre-packed.
 
 ```js
 import DeckGL, {IconLayer} from 'deck.gl';
@@ -93,7 +92,7 @@ const App = ({data, viewport}) => {
     id: 'icon-layer',
     data: octokit.repos.getContributors({
       owner: 'uber',
-      repo: 'deck.gl' 
+      repo: 'deck.gl'
     }).then(result => result.data),
     // iconAtlas and iconMapping should not be provided
     // getIcon return an object which contains url to fetch icon of each data point
@@ -103,7 +102,7 @@ const App = ({data, viewport}) => {
       height: 128,
       anchorY: 128
     }),
-    // icon size is based on data point's contributions, between 2 - 25 
+    // icon size is based on data point's contributions, between 2 - 25
     getSize: d => Math.max(2, Math.min(d.contributions / 1000 * 25, 25)),
     pickable: true,
     sizeScale: 15,
@@ -139,10 +138,10 @@ new IconLayer({});
 To use pre-bundled scripts:
 
 ```html
-<script src="https://unpkg.com/@deck.gl@~7.0.0/dist.min.js"></script>
+<script src="https://unpkg.com/deck.gl@^8.0.0/dist.min.js"></script>
 <!-- or -->
-<script src="https://unpkg.com/@deck.gl/core@~7.0.0/dist.min.js"></script>
-<script src="https://unpkg.com/@deck.gl/layers@~7.0.0/dist.min.js"></script>
+<script src="https://unpkg.com/@deck.gl/core@^8.0.0/dist.min.js"></script>
+<script src="https://unpkg.com/@deck.gl/layers@^8.0.0/dist.min.js"></script>
 ```
 
 ```js
@@ -173,13 +172,13 @@ Icon names mapped to icon definitions. Each icon is defined with the following v
   If `false`, pixel color from the image is applied. User still can specify the opacity through getColor.
   Default: `false`
 
-If you go with pre-packed strategy, both `iconAtlas` and `iconMapping` are required. 
+If you go with pre-packed strategy, both `iconAtlas` and `iconMapping` are required.
 
-If you choose to use auto packing, then `iconAtlas` and `iconMapping` should not be provided, 
-otherwise it causes error since `IconLayer` will attempt to retrieve icons from 
+If you choose to use auto packing, then `iconAtlas` and `iconMapping` should not be provided,
+otherwise it causes error since `IconLayer` will attempt to retrieve icons from
 given pre-packed `iconAtlas`.
 
-##### `sizeScale` (Number, optional)
+##### `sizeScale` (Number, optional) ![transition-enabled](https://img.shields.io/badge/transition-enabled-green.svg?style=flat-square")
 
 - Default: `1`
 
@@ -187,33 +186,34 @@ Icon size multiplier.
 
 ##### `sizeUnits` (String, optional)
 
-* Default: `pixels` 
+* Default: `pixels`
 
 The units of the size specified by `getSize`, one of `'meters'`, `'pixels'`. When zooming in and out, meter sizes scale with the base map, and pixel sizes remain the same on screen.
 
-##### `sizeMinPixels` (Number, optional)
+##### `sizeMinPixels` (Number, optional) ![transition-enabled](https://img.shields.io/badge/transition-enabled-green.svg?style=flat-square")
 
 * Default: `0`
 
 The minimum size in pixels.
 
-##### `sizeMaxPixels` (Number, optional)
+##### `sizeMaxPixels` (Number, optional) ![transition-enabled](https://img.shields.io/badge/transition-enabled-green.svg?style=flat-square")
 
 * Default: `Number.MAX_SAFE_INTEGER`
 
 The maximum size in pixels.
-
-##### `fp64` (Boolean, optional)
-
-- Default: `false`
-
-Whether the layer should be rendered in high-precision 64-bit mode. Note that since deck.gl v6.1, the default 32-bit projection uses a hybrid mode that matches 64-bit precision with significantly better performance.
 
 ##### `billboard` (Boolean, optional)
 
 - Default: `true`
 
 If on, the icon always faces camera. Otherwise the icon faces up (z)
+
+##### `alphaCutoff` (Number, optional)
+
+- Default: `0.05`
+
+Discard pixels whose opacity is below this threshold. A discarded pixel would create a "hole" in the icon that is not considered part of the object. This is useful for customizing picking behavior, e.g. setting `alphaCutoff: 0, autoHighlight` will highlight an object whenever the cursor moves into its bounding box, instead of over the visible pixels.
+
 
 ### Data Accessors
 
@@ -223,16 +223,16 @@ If on, the icon always faces camera. Otherwise the icon faces up (z)
 
 Method called to retrieve the icon name of each object, returns string or object.
 
-If you go with pre-packed strategy, then `getIcon` should return a string representing name of the icon, 
+If you go with pre-packed strategy, then `getIcon` should return a string representing name of the icon,
 used to retrieve icon definition from given `iconMapping`.
 
-If you choose to use auto packing, then `getIcon` should return an object which contains 
-the following properties. 
+If you choose to use auto packing, then `getIcon` should return an object which contains
+the following properties.
 
 - `url` (String, required): url to fetch the icon
 - `height` (Number, required): height of icon
 - `width` (Number, required): width of icon
-- `id`: (String, optional): unique identifier of the icon, fall back to `url` if not specified 
+- `id`: (String, optional): unique identifier of the icon, fall back to `url` if not specified
 - `anchorX`, `anchorY`, `mask` are the same as mentioned in `iconMapping`
 
 `IconLayer` use `id` (fallback to `url`) to dedupe icons. If for the same icon identifier, `getIcon` returns different `width` or `height`, `IconLayer` will only apply the first occurrence and ignore the rest of them.
@@ -258,7 +258,7 @@ The height of each object, in units specified by `sizeUnits` (default pixels).
 
 - Default: `[0, 0, 0, 255]`
 
-The rgba color of each object, in `r, g, b, [a]`. Each component is in the 0-255 range.
+The rgba color is in the format of `[r, g, b, [a]]`. Each channel is a number between 0-255 and `a` is 255 if not supplied.
 
 - If an array is provided, it is used as the color for all objects.
 - If a function is provided, it is called on each object to retrieve its color.
@@ -274,7 +274,13 @@ The rotating angle  of each object, in degrees.
 - If a function is provided, it is called on each object to retrieve its angle.
 
 
+## Use binary attributes
+
+This section is about the special requirements when [supplying attributes directly](/docs/developer-guide/performance.md#supply-attributes-directly) to an `IconLayer`.
+
+If `data.attributes.getIcon` is supplied, since its value can only be a typed array, `iconMapping` can only use integers as keys.
+
+
 ## Source
 
 [modules/layers/src/icon-layer](https://github.com/uber/deck.gl/tree/master/modules/layers/src/icon-layer)
-

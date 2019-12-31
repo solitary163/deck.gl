@@ -1,8 +1,6 @@
-/* global window */
 import React, {Component} from 'react';
 import {render} from 'react-dom';
 import {StaticMap} from 'react-map-gl';
-import {PhongMaterial} from '@luma.gl/core';
 import {AmbientLight, PointLight, LightingEffect} from '@deck.gl/core';
 import {HexagonLayer} from '@deck.gl/aggregation-layers';
 import DeckGL from '@deck.gl/react';
@@ -33,14 +31,14 @@ const pointLight2 = new PointLight({
 
 const lightingEffect = new LightingEffect({ambientLight, pointLight1, pointLight2});
 
-const material = new PhongMaterial({
+const material = {
   ambient: 0.64,
   diffuse: 0.6,
   shininess: 32,
   specularColor: [51, 51, 51]
-});
+};
 
-export const INITIAL_VIEW_STATE = {
+const INITIAL_VIEW_STATE = {
   longitude: -1.4157267858730052,
   latitude: 52.232395363869415,
   zoom: 6.6,
@@ -62,7 +60,7 @@ const colorRange = [
 const elevationScale = {min: 1, max: 50};
 
 /* eslint-disable react/no-deprecated */
-export class App extends Component {
+export default class App extends Component {
   static get defaultColorRange() {
     return colorRange;
   }
@@ -72,50 +70,6 @@ export class App extends Component {
     this.state = {
       elevationScale: elevationScale.min
     };
-
-    this.startAnimationTimer = null;
-    this.intervalTimer = null;
-
-    this._startAnimate = this._startAnimate.bind(this);
-    this._animateHeight = this._animateHeight.bind(this);
-  }
-
-  componentDidMount() {
-    this._animate();
-  }
-
-  componentWillReceiveProps(nextProps) {
-    if (nextProps.data && this.props.data && nextProps.data.length !== this.props.data.length) {
-      this._animate();
-    }
-  }
-
-  componentWillUnmount() {
-    this._stopAnimate();
-  }
-
-  _animate() {
-    this._stopAnimate();
-
-    // wait 1.5 secs to start animation so that all data are loaded
-    this.startAnimationTimer = window.setTimeout(this._startAnimate, 1500);
-  }
-
-  _startAnimate() {
-    this.intervalTimer = window.setInterval(this._animateHeight, 20);
-  }
-
-  _stopAnimate() {
-    window.clearTimeout(this.startAnimationTimer);
-    window.clearTimeout(this.intervalTimer);
-  }
-
-  _animateHeight() {
-    if (this.state.elevationScale === elevationScale.max) {
-      this._stopAnimate();
-    } else {
-      this.setState({elevationScale: this.state.elevationScale + 1});
-    }
   }
 
   _renderLayers() {
@@ -128,38 +82,38 @@ export class App extends Component {
         coverage,
         data,
         elevationRange: [0, 3000],
-        elevationScale: this.state.elevationScale,
+        elevationScale: data && data.length ? 50 : 0,
         extruded: true,
         getPosition: d => d,
         onHover: this.props.onHover,
-        opacity: 1,
         pickable: Boolean(this.props.onHover),
         radius,
         upperPercentile,
-        material
+        material,
+
+        transitions: {
+          elevationScale: 3000
+        }
       })
     ];
   }
 
   render() {
-    const {viewState, controller = true, baseMap = true} = this.props;
+    const {mapStyle = 'mapbox://styles/mapbox/dark-v9'} = this.props;
 
     return (
       <DeckGL
         layers={this._renderLayers()}
         effects={[lightingEffect]}
         initialViewState={INITIAL_VIEW_STATE}
-        viewState={viewState}
-        controller={controller}
+        controller={true}
       >
-        {baseMap && (
-          <StaticMap
-            reuseMaps
-            mapStyle="mapbox://styles/mapbox/dark-v9"
-            preventStyleDiffing={true}
-            mapboxApiAccessToken={MAPBOX_TOKEN}
-          />
-        )}
+        <StaticMap
+          reuseMaps
+          mapStyle={mapStyle}
+          preventStyleDiffing={true}
+          mapboxApiAccessToken={MAPBOX_TOKEN}
+        />
       </DeckGL>
     );
   }

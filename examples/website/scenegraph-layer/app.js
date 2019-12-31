@@ -3,12 +3,13 @@ import React, {Component, Fragment} from 'react';
 import {render} from 'react-dom';
 
 import {StaticMap} from 'react-map-gl';
-import DeckGL, {ScenegraphLayer} from 'deck.gl';
+import DeckGL from '@deck.gl/react';
+import {ScenegraphLayer} from '@deck.gl/mesh-layers';
 
-import {GLTFScenegraphLoader} from '@luma.gl/addons';
+import {GLTFLoader} from '@loaders.gl/gltf';
 import {registerLoaders} from '@loaders.gl/core';
 
-registerLoaders([GLTFScenegraphLoader]);
+registerLoaders([GLTFLoader]);
 
 // Set your mapbox token here
 const MAPBOX_TOKEN = process.env.MapboxAccessToken; // eslint-disable-line
@@ -18,14 +19,14 @@ const MAPBOX_STYLE =
 
 const DATA_URL = 'https://opensky-network.org/api/states/all';
 const MODEL_URL =
-  'https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Models/master/2.0/Duck/glTF-Binary/Duck.glb';
+  'https://raw.githubusercontent.com/uber-common/deck.gl-data/master/examples/scenegraph-layer/airplane.glb';
 const REFRESH_TIME = 30000;
 
 const ANIMATIONS = {
   '*': {speed: 1}
 };
 
-export const INITIAL_VIEW_STATE = {
+const INITIAL_VIEW_STATE = {
   latitude: 39.1,
   longitude: -94.57,
   zoom: 3.8,
@@ -47,7 +48,7 @@ const DATA_INDEX = {
   POSITION_SOURCE: 16
 };
 
-export class App extends Component {
+export default class App extends Component {
   constructor(props) {
     super(props);
     this.state = {};
@@ -101,20 +102,17 @@ export class App extends Component {
           id: 'scenegraph-layer',
           data,
           pickable: true,
-          sizeScale: 2000,
+          sizeScale: 250,
           scenegraph: MODEL_URL,
           _animations: ANIMATIONS,
+          sizeMinPixels: 0.1,
+          sizeMaxPixels: 1.5,
           getPosition: d => [
             d[DATA_INDEX.LONGITUDE] || 0,
             d[DATA_INDEX.LATITUDE] || 0,
             d[DATA_INDEX.GEO_ALTITUDE] || 0
           ],
-          getOrientation: d => [
-            this._verticalRateToAngle(d),
-            // TODO: Fix this direction
-            (d[DATA_INDEX.TRUE_TRACK] || 0) - 180,
-            90
-          ],
+          getOrientation: d => [this._verticalRateToAngle(d), -d[DATA_INDEX.TRUE_TRACK] || 0, 90],
           getTranslation: [0, 0, 0],
           getScale: [1, 1, 1],
           transitions: {
@@ -135,6 +133,7 @@ export class App extends Component {
     const track = this.state.hoverObject[DATA_INDEX.TRUE_TRACK] || 0;
     return (
       <Fragment>
+        <div>&nbsp;</div>
         <div>Unique ID: {icao24}</div>
         <div>Call Sign: {callsign}</div>
         <div>Country: {originCountry}</div>
@@ -175,27 +174,24 @@ export class App extends Component {
   }
 
   render() {
-    const {viewState, controller = true, baseMap = true} = this.props;
+    const {mapStyle = MAPBOX_STYLE} = this.props;
 
     return (
       <Fragment>
         <DeckGL
           layers={this._renderLayers()}
           initialViewState={INITIAL_VIEW_STATE}
-          viewState={viewState}
-          controller={controller}
+          controller={true}
           _animate
         >
-          {baseMap && (
-            <StaticMap
-              reuseMaps
-              mapStyle={MAPBOX_STYLE}
-              preventStyleDiffing={true}
-              mapboxApiAccessToken={MAPBOX_TOKEN}
-            />
-          )}
+          <StaticMap
+            reuseMaps
+            mapStyle={mapStyle}
+            preventStyleDiffing={true}
+            mapboxApiAccessToken={MAPBOX_TOKEN}
+          />
         </DeckGL>
-        {/* this._renderInfoBox() */}
+        {this._renderInfoBox()}
       </Fragment>
     );
   }

@@ -2,9 +2,9 @@
 import React, {Component} from 'react';
 import {render} from 'react-dom';
 import {StaticMap} from 'react-map-gl';
-import DeckGL from 'deck.gl';
-import ArcBrushingLayer from './brushing-layers/arc-brushing-layer';
-import ScatterplotBrushingLayer from './brushing-layers/scatterplot-brushing-layer';
+import DeckGL from '@deck.gl/react';
+import {ScatterplotLayer, ArcLayer} from '@deck.gl/layers';
+import {BrushingExtension} from '@deck.gl/extensions';
 import {scaleLinear} from 'd3-scale';
 
 // Set your mapbox token here
@@ -33,7 +33,7 @@ const SOURCE_COLOR = [166, 3, 3];
 // migrate in
 const TARGET_COLOR = [35, 181, 184];
 
-export const INITIAL_VIEW_STATE = {
+const INITIAL_VIEW_STATE = {
   longitude: -100,
   latitude: 40.7,
   zoom: 3,
@@ -42,19 +42,18 @@ export const INITIAL_VIEW_STATE = {
   bearing: 0
 };
 
+const brushingExtension = new BrushingExtension();
+
 /* eslint-disable react/no-deprecated */
-export class App extends Component {
+export default class App extends Component {
   constructor(props) {
     super(props);
     this.state = {
       arcs: [],
       targets: [],
       sources: [],
-      mousePosition: null,
       ...this._getLayerData(props)
     };
-    this._onMouseMove = this._onMouseMove.bind(this);
-    this._onMouseLeave = this._onMouseLeave.bind(this);
     this._onHover = this._onHover.bind(this);
   }
 
@@ -64,16 +63,6 @@ export class App extends Component {
         ...this._getLayerData(nextProps)
       });
     }
-  }
-
-  _onMouseMove(evt) {
-    if (evt.nativeEvent) {
-      this.setState({mousePosition: [evt.nativeEvent.offsetX, evt.nativeEvent.offsetY]});
-    }
-  }
-
-  _onMouseLeave() {
-    this.setState({mousePosition: null});
   }
 
   _onHover({x, y, object}) {
@@ -172,95 +161,83 @@ export class App extends Component {
       opacity = 0.7
     } = this.props;
 
-    const {arcs, targets, sources, mousePosition} = this.state;
-
-    const isMouseover = mousePosition !== null;
-    const startBrushing = Boolean(isMouseover && enableBrushing);
+    const {arcs, targets, sources} = this.state;
 
     if (!arcs || !targets) {
       return null;
     }
 
     return [
-      new ScatterplotBrushingLayer({
+      new ScatterplotLayer({
         id: 'sources',
         data: sources,
-        brushRadius,
-        brushTarget: true,
-        mousePosition,
-        opacity: 1,
-        enableBrushing: startBrushing,
+        brushingRadius: brushRadius,
+        brushingEnabled: enableBrushing,
         pickable: false,
         // only show source points when brushing
-        radiusScale: startBrushing ? 3000 : 0,
+        radiusScale: enableBrushing ? 3000 : 0,
         getFillColor: d => (d.gain > 0 ? TARGET_COLOR : SOURCE_COLOR),
-        getTargetPosition: d => [d.position[0], d.position[1], 0]
+        extensions: [brushingExtension]
       }),
-      new ScatterplotBrushingLayer({
+      new ScatterplotLayer({
         id: 'targets-ring',
         data: targets,
-        brushRadius,
-        mousePosition,
+        brushingRadius: brushRadius,
         lineWidthMinPixels: 2,
         stroked: true,
         filled: false,
-        opacity: 1,
-        enableBrushing: startBrushing,
+        brushingEnabled: enableBrushing,
         // only show rings when brushing
-        radiusScale: startBrushing ? 4000 : 0,
-        getLineColor: d => (d.net > 0 ? TARGET_COLOR : SOURCE_COLOR)
+        radiusScale: enableBrushing ? 4000 : 0,
+        getLineColor: d => (d.net > 0 ? TARGET_COLOR : SOURCE_COLOR),
+        extensions: [brushingExtension]
       }),
-      new ScatterplotBrushingLayer({
+      new ScatterplotLayer({
         id: 'targets',
         data: targets,
-        brushRadius,
-        mousePosition,
-        opacity: 1,
-        enableBrushing: startBrushing,
+        brushingRadius: brushRadius,
+        brushingEnabled: enableBrushing,
         pickable: true,
         radiusScale: 3000,
         onHover: this._onHover,
-        getFillColor: d => (d.net > 0 ? TARGET_COLOR : SOURCE_COLOR)
+        getFillColor: d => (d.net > 0 ? TARGET_COLOR : SOURCE_COLOR),
+        extensions: [brushingExtension]
       }),
-      new ArcBrushingLayer({
+      new ArcLayer({
         id: 'arc',
         data: arcs,
         getWidth: strokeWidth,
         opacity,
-        brushRadius,
-        enableBrushing: startBrushing,
-        mousePosition,
+        brushingRadius: brushRadius,
+        brushingEnabled: enableBrushing,
         getSourcePosition: d => d.source,
         getTargetPosition: d => d.target,
         getSourceColor: SOURCE_COLOR,
-        getTargetColor: TARGET_COLOR
+        getTargetColor: TARGET_COLOR,
+        extensions: [brushingExtension]
       })
     ];
   }
 
   render() {
-    const {viewState, controller = true, baseMap = true} = this.props;
+    const {mapStyle = 'mapbox://styles/mapbox/light-v9'} = this.props;
 
     return (
-      <div onMouseMove={this._onMouseMove} onMouseLeave={this._onMouseLeave}>
-        {this._renderTooltip()}
+      <DeckGL
+        ref={this._deckRef}
+        layers={this._renderLayers()}
+        initialViewState={INITIAL_VIEW_STATE}
+        controller={true}
+      >
+        <StaticMap
+          reuseMaps
+          mapStyle={mapStyle}
+          preventStyleDiffing={true}
+          mapboxApiAccessToken={MAPBOX_TOKEN}
+        />
 
-        <DeckGL
-          layers={this._renderLayers()}
-          initialViewState={INITIAL_VIEW_STATE}
-          viewState={viewState}
-          controller={controller}
-        >
-          {baseMap && (
-            <StaticMap
-              reuseMaps
-              mapStyle="mapbox://styles/mapbox/light-v9"
-              preventStyleDiffing={true}
-              mapboxApiAccessToken={MAPBOX_TOKEN}
-            />
-          )}
-        </DeckGL>
-      </div>
+        {this._renderTooltip()}
+      </DeckGL>
     );
   }
 }

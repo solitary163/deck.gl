@@ -1,7 +1,8 @@
 import React, {Component} from 'react';
 import {render} from 'react-dom';
 import {StaticMap} from 'react-map-gl';
-import DeckGL, {ScreenGridLayer} from 'deck.gl';
+import DeckGL from '@deck.gl/react';
+import {ScreenGridLayer} from '@deck.gl/aggregation-layers';
 import {isWebGL2} from '@luma.gl/core';
 
 // Set your mapbox token here
@@ -11,7 +12,7 @@ const MAPBOX_TOKEN = process.env.MapboxAccessToken; // eslint-disable-line
 const DATA_URL =
   'https://raw.githubusercontent.com/uber-common/deck.gl-data/master/examples/screen-grid/uber-pickup-locations.json'; // eslint-disable-line
 
-export const INITIAL_VIEW_STATE = {
+const INITIAL_VIEW_STATE = {
   longitude: -73.75,
   latitude: 40.73,
   zoom: 9.6,
@@ -29,14 +30,15 @@ const colorRange = [
   [189, 0, 38, 255]
 ];
 
-export class App extends Component {
+export default class App extends Component {
   _renderLayers() {
-    const {data = DATA_URL, cellSize = 20, gpuAggregation = true, aggregation = 'Sum'} = this.props;
+    const {data = DATA_URL, cellSize = 20, gpuAggregation = true, aggregation = 'SUM'} = this.props;
 
     return [
       new ScreenGridLayer({
         id: 'grid',
         data,
+        opacity: 0.8,
         getPosition: d => [d[0], d[1]],
         getWeight: d => d[2],
         cellSizePixels: cellSize,
@@ -57,24 +59,21 @@ export class App extends Component {
   }
 
   render() {
-    const {viewState, controller = true, baseMap = true} = this.props;
+    const {mapStyle = 'mapbox://styles/mapbox/dark-v9'} = this.props;
 
     return (
       <DeckGL
         layers={this._renderLayers()}
         initialViewState={INITIAL_VIEW_STATE}
         onWebGLInitialized={this._onInitialized.bind(this)}
-        viewState={viewState}
-        controller={controller}
+        controller={true}
       >
-        {baseMap && (
-          <StaticMap
-            reuseMaps
-            mapStyle="mapbox://styles/mapbox/dark-v9"
-            preventStyleDiffing={true}
-            mapboxApiAccessToken={MAPBOX_TOKEN}
-          />
-        )}
+        <StaticMap
+          reuseMaps
+          mapStyle={mapStyle}
+          preventStyleDiffing={true}
+          mapboxApiAccessToken={MAPBOX_TOKEN}
+        />
       </DeckGL>
     );
   }

@@ -2,7 +2,6 @@
 
 <p class="badges">
   <img src="https://img.shields.io/badge/@deck.gl/geo--layers-lightgrey.svg?style=flat-square" alt="@deck.gl/geo-layers" />
-  <img src="https://img.shields.io/badge/fp64-yes-blue.svg?style=flat-square" alt="64-bit" />
   <img src="https://img.shields.io/badge/lighting-yes-blue.svg?style=flat-square" alt="lighting" />
 </p>
 
@@ -36,17 +35,16 @@ const App = ({data, viewport}) => {
   const layer = new S2Layer({
     id: 's2-layer',
     data,
-    opacity: 0.6,
     pickable: true,
-    stroked: true,
+    wireframe: false,
     filled: true,
     extruded: true,
     elevationScale: 1000,
     getS2Token: d => d.token,
-    getFillColor: d => [d.value * 255, (1 - d.value) * 255, (1 - d.value) * 128, 128],
+    getFillColor: d => [d.value * 255, (1 - d.value) * 255, (1 - d.value) * 128],
     getElevation: d => d.value,
     onHover: ({object, x, y}) => {
-      const tooltip = `${object.token}`;
+      const tooltip = `${object.token} value: ${object.value}`;
       /* Update tooltip
          http://deck.gl/#/documentation/developer-guide/adding-interactivity?section=example-display-a-tooltip-for-hovered-object
       */
@@ -76,12 +74,12 @@ new S2Layer({});
 To use pre-bundled scripts:
 
 ```html
-<script src="https://unpkg.com/s2-geometry"></script>
-<script src="https://unpkg.com/@deck.gl@~7.0.0/dist.min.js"></script>
+<script src="https://bundle.run/s2-geometry@1.2.10"></script>
+<script src="https://unpkg.com/deck.gl@^8.0.0/dist.min.js"></script>
 <!-- or -->
-<script src="https://unpkg.com/@deck.gl/core@~7.0.0/dist.min.js"></script>
-<script src="https://unpkg.com/@deck.gl/layers@~7.0.0/dist.min.js"></script>
-<script src="https://unpkg.com/@deck.gl/geo-layers@~7.0.0/dist.min.js"></script>
+<script src="https://unpkg.com/@deck.gl/core@^8.0.0/dist.min.js"></script>
+<script src="https://unpkg.com/@deck.gl/layers@^8.0.0/dist.min.js"></script>
+<script src="https://unpkg.com/@deck.gl/geo-layers@^8.0.0/dist.min.js"></script>
 ```
 
 ```js
@@ -96,6 +94,12 @@ Inherits from all [Base Layer](/docs/api-reference/layer.md), [CompositeLayer](/
 ### Data Accessors
 
 ##### `getS2Token` ([Function](/docs/developer-guide/using-layers.md#accessors), optional) ![transition-enabled](https://img.shields.io/badge/transition-enabled-green.svg?style=flat-square")
+
+Called for each data object to retrieve the identifier of the S2 cell. May return one of the following:
+
+- A string that is the cell's hex token
+- A string that is the Hilbert quad key (containing `/`)
+- A [Long](https://www.npmjs.com/package/long) object that is the cell's id
 
 Check [S2 Cell](http://s2geometry.io/devguide/s2cell_hierarchy) for more details.
 

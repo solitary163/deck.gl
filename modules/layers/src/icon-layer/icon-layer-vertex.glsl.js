@@ -24,7 +24,7 @@ export default `\
 attribute vec2 positions;
 
 attribute vec3 instancePositions;
-attribute vec2 instancePositions64xyLow;
+attribute vec3 instancePositions64Low;
 attribute float instanceSizes;
 attribute float instanceAngles;
 attribute vec4 instanceColors;
@@ -42,6 +42,7 @@ uniform bool billboard;
 varying float vColorMode;
 varying vec4 vColor;
 varying vec2 vTextureCoords;
+varying vec2 uv;
 
 vec2 rotate_by_angle(vec2 vertex, float angle) {
   float angle_radian = angle * PI / 180.0;
@@ -52,6 +53,11 @@ vec2 rotate_by_angle(vec2 vertex, float angle) {
 }
 
 void main(void) {
+  geometry.worldPosition = instancePositions;
+  geometry.uv = positions;
+  geometry.pickingColor = instancePickingColors;
+  uv = positions;
+
   vec2 iconSize = instanceIconFrames.zw;
   // convert size in meters to pixels, then scaled and clamp
  
@@ -67,16 +73,20 @@ void main(void) {
   // scale and rotate vertex in "pixel" value and convert back to fraction in clipspace
   vec2 pixelOffset = positions / 2.0 * iconSize + instanceOffsets;
   pixelOffset = rotate_by_angle(pixelOffset, instanceAngles) * instanceScale;
+  pixelOffset.y *= -1.0;
 
   if (billboard)  {
-    pixelOffset.y *= -1.0;
-    gl_Position = project_position_to_clipspace(instancePositions, instancePositions64xyLow, vec3(0.0)); 
-    gl_Position.xy += project_pixel_size_to_clipspace(pixelOffset);
+    gl_Position = project_position_to_clipspace(instancePositions, instancePositions64Low, vec3(0.0), geometry.position);
+    vec3 offset = vec3(pixelOffset, 0.0);
+    DECKGL_FILTER_SIZE(offset, geometry);
+    gl_Position.xy += project_pixel_size_to_clipspace(offset.xy);
 
   } else {
     vec3 offset_common = vec3(project_pixel_size(pixelOffset), 0.0);
-    gl_Position = project_position_to_clipspace(instancePositions, instancePositions64xyLow, offset_common); 
+    DECKGL_FILTER_SIZE(offset_common, geometry);
+    gl_Position = project_position_to_clipspace(instancePositions, instancePositions64Low, offset_common, geometry.position); 
   }
+  DECKGL_FILTER_GL_POSITION(gl_Position, geometry);
 
   vTextureCoords = mix(
     instanceIconFrames.xy,
@@ -84,13 +94,9 @@ void main(void) {
     (positions.xy + 1.0) / 2.0
   ) / iconsTextureDim;
 
-  vTextureCoords.y = 1.0 - vTextureCoords.y;
-
-  vColor = instanceColors / 255.;
+  vColor = instanceColors;
+  DECKGL_FILTER_COLOR(vColor, geometry);
 
   vColorMode = instanceColorModes;
-
-  // Set color to be rendered to picking fbo (also used to check for selection highlight).
-  picking_setPickingColor(instancePickingColors);
 }
 `;

@@ -17,8 +17,9 @@
 // LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
-import {experimental} from '@deck.gl/core';
-const {count} = experimental;
+import {_count as count} from '@deck.gl/core';
+
+function noop() {}
 
 function defaultAssert(condition, comment) {
   if (!condition) {
@@ -67,55 +68,52 @@ export function generateLayerTests({
   const {_propTypes: propTypes, _mergedDefaultProps: defaultProps} = Layer;
 
   // Test alternative data formats
-  for (const {title, props} of makeAltDataTestCases(sampleProps, propTypes)) {
-    testCases.push({
-      title,
-      updateProps: props
-    });
-  }
+  testCases.push(...makeAltDataTestCases(sampleProps, propTypes));
 
   for (const propName in Layer.defaultProps) {
     if (!(propName in sampleProps)) {
       // Do not override user provided props - they may be layer-specific
-      const newTestCase = makeAltPropTestCase(propName, propTypes, defaultProps);
-      if (newTestCase) {
-        testCases.push({
-          title: newTestCase.title,
-          updateProps: newTestCase.props
-        });
-      }
+      const newTestCase =
+        makeAltPropTestCase({propName, propTypes, defaultProps, sampleProps, assert}) || [];
+      testCases.push(...newTestCase);
     }
   }
 
-  const _onAfterUpdate = params => {
-    // User callback
-    onAfterUpdate(params);
-
-    // Default assert
-    if (runDefaultAsserts) {
-      if (params.layer.isComposite) {
-        if (count(params.layer.props.data)) {
-          assert(params.subLayers.length, 'Layer should have sublayers');
-        }
-      } else {
-        assert(params.layer.getModels().length, 'Layer should have models');
-      }
-    }
-  };
-
   testCases.forEach(testCase => {
     testCase.title = wrapTestCaseTitle(testCase.title);
-    testCase.onBeforeUpdate = onBeforeUpdate;
-    testCase.onAfterUpdate = _onAfterUpdate;
+    const beforeFunc = testCase.onBeforeUpdate || noop;
+    const afterFunc = testCase.onAfterUpdate || noop;
+    testCase.onBeforeUpdate = params => {
+      // Generated callback
+      beforeFunc(params);
+      // User callback
+      onBeforeUpdate(params);
+    };
+    testCase.onAfterUpdate = params => {
+      // Generated callback
+      afterFunc(params);
+      // User callback
+      onAfterUpdate(params);
+
+      // Default assert
+      if (runDefaultAsserts) {
+        if (params.layer.isComposite) {
+          if (count(params.layer.props.data)) {
+            assert(params.subLayers.length, 'Layer should have sublayers');
+          }
+        } else {
+          assert(params.layer.getModels().length, 'Layer should have models');
+        }
+      }
+    };
   });
 
   return testCases;
 }
 
-function makeAltPropTestCase(propName, propTypes, defaultProps) {
-  const newProps = {};
+function makeAltPropTestCase({propName, propTypes, defaultProps, sampleProps, assert}) {
+  const newProps = {...sampleProps};
   const propDef = propTypes[propName];
-  let title;
 
   if (!propDef) {
     return null;
@@ -124,8 +122,12 @@ function makeAltPropTestCase(propName, propTypes, defaultProps) {
   switch (propDef.type) {
     case 'boolean':
       newProps[propName] = !defaultProps[propName];
-      title = String(newProps[propName]);
-      break;
+      return [
+        {
+          title: `${propName}: ${String(newProps[propName])}`,
+          props: newProps
+        }
+      ];
 
     case 'number':
       if ('max' in propDef) {
@@ -135,24 +137,51 @@ function makeAltPropTestCase(propName, propTypes, defaultProps) {
       } else {
         newProps[propName] = defaultProps[propName] + 1;
       }
-      title = String(newProps[propName]);
-      break;
+      return [
+        {
+          title: `${propName}: ${String(newProps[propName])}`,
+          props: newProps
+        }
+      ];
 
-    case 'accessor':
+    case 'accessor': {
       if (typeof defaultProps[propName] === 'function') {
         return null;
       }
-      newProps[propName] = () => defaultProps[propName];
-      newProps.updateTriggers = {
-        [propName]: propName
+      let callCount = 0;
+      newProps[propName] = () => {
+        callCount++;
+        return defaultProps[propName];
       };
-      title = `() => ${defaultProps[propName]}`;
-      break;
+      newProps.updateTriggers = {
+        [propName]: 'function'
+      };
+      const onBeforeUpdate = () => (callCount = 0);
+      const onAfterUpdate = () => assert(callCount > 0, 'accessor function is called');
+
+      return [
+        {
+          title: `${propName}: () => ${defaultProps[propName]}`,
+          props: newProps,
+          onBeforeUpdate,
+          onAfterUpdate
+        },
+        {
+          title: `${propName}: updateTrigger`,
+          updateProps: {
+            updateTriggers: {
+              [propName]: 'function+trigger'
+            }
+          },
+          onBeforeUpdate,
+          onAfterUpdate
+        }
+      ];
+    }
 
     default:
       return null;
   }
-  return {title: `${propName}: ${title}`, props: newProps};
 }
 
 function makeAltDataTestCases(props, propTypes) {
@@ -160,9 +189,15 @@ function makeAltDataTestCases(props, propTypes) {
   if (!Array.isArray(originalData)) {
     return [];
   }
+  // partial update
+  const partialUpdateProps = {
+    data: originalData.slice(),
+    _dataDiff: () => [{startRow: 0, endRow: 2}]
+  };
   // data should support any iterable
   const genIterableProps = {
-    data: new Set(originalData)
+    data: new Set(originalData),
+    _dataDiff: null
   };
   // data in non-iterable form
   const nonIterableProps = {
@@ -178,12 +213,16 @@ function makeAltDataTestCases(props, propTypes) {
 
   return [
     {
+      title: 'Partial update',
+      updateProps: partialUpdateProps
+    },
+    {
       title: 'Generic iterable data',
-      props: genIterableProps
+      updateProps: genIterableProps
     },
     {
       title: 'non-iterable data',
-      props: nonIterableProps
+      updateProps: nonIterableProps
     }
   ];
 }

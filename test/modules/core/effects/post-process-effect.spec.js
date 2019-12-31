@@ -1,5 +1,6 @@
 import test from 'tape-catch';
 import {gl} from '@deck.gl/test-utils';
+import {Framebuffer} from '@luma.gl/core';
 import PostProcessEffect from '@deck.gl/core/effects/post-process-effect';
 
 const fs = `\
@@ -24,11 +25,28 @@ test('PostProcessEffect#constructor', t => {
   t.end();
 });
 
-test('PostProcessEffect#prepare', t => {
+test('PostProcessEffect#postRender', t => {
   const effect = new PostProcessEffect(testModule);
-  effect.prepare(gl);
+  effect.preRender(gl);
+  const inputBuffer = new Framebuffer(gl);
+  const outputBuffer = new Framebuffer(gl);
+
+  const buffer1 = effect.postRender(gl, {inputBuffer, swapBuffer: outputBuffer});
   t.ok(effect.passes, 'post-processing pass created');
-  t.equal(effect.passes.length, 1, 'post-processing pass length is right');
+
+  t.ok(buffer1, 'post-processing effect rendered without throwing');
+  t.is(buffer1, outputBuffer, 'post-processing effect buffer swapped');
+
+  const buffer2 = effect.postRender(gl, {
+    inputBuffer,
+    swapBuffer: outputBuffer,
+    target: Framebuffer.getDefaultFramebuffer(gl)
+  });
+  t.ok(buffer2, 'post-processing effect rendered without throwing');
+  t.is(buffer2, Framebuffer.getDefaultFramebuffer(gl), 'post-processing effect rendered to target');
+
   effect.cleanup();
+  inputBuffer.delete();
+  outputBuffer.delete();
   t.end();
 });

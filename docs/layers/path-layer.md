@@ -2,7 +2,6 @@
 
 <p class="badges">
   <img src="https://img.shields.io/badge/@deck.gl/layers-lightgrey.svg?style=flat-square" alt="@deck.gl/layers" />
-  <img src="https://img.shields.io/badge/fp64-yes-blue.svg?style=flat-square" alt="64-bit" />
 </p>
 
 # PathLayer
@@ -65,10 +64,10 @@ new PathLayer({});
 To use pre-bundled scripts:
 
 ```html
-<script src="https://unpkg.com/@deck.gl@~7.0.0/dist.min.js"></script>
+<script src="https://unpkg.com/deck.gl@^8.0.0/dist.min.js"></script>
 <!-- or -->
-<script src="https://unpkg.com/@deck.gl/core@~7.0.0/dist.min.js"></script>
-<script src="https://unpkg.com/@deck.gl/layers@~7.0.0/dist.min.js"></script>
+<script src="https://unpkg.com/@deck.gl/core@^8.0.0/dist.min.js"></script>
+<script src="https://unpkg.com/@deck.gl/layers@^8.0.0/dist.min.js"></script>
 ```
 
 ```js
@@ -87,19 +86,19 @@ Inherits from all [Base Layer](/docs/api-reference/layer.md) properties.
 
 The units of the line width, one of `'meters'`, `'pixels'`. When zooming in and out, meter sizes scale with the base map, and pixel sizes remain the same on screen.
 
-##### `widthScale` (Number, optional)
+##### `widthScale` (Number, optional) ![transition-enabled](https://img.shields.io/badge/transition-enabled-green.svg?style=flat-square")
 
 * Default: `1`
 
 The path width multiplier that multiplied to all paths.
 
-##### `widthMinPixels` (Number, optional)
+##### `widthMinPixels` (Number, optional) ![transition-enabled](https://img.shields.io/badge/transition-enabled-green.svg?style=flat-square")
 
 * Default: `0`
 
 The minimum path width in pixels. This prop can be used to prevent the path from getting too thin when zoomed out.
 
-##### `widthMaxPixels` (Number, optional)
+##### `widthMaxPixels` (Number, optional) ![transition-enabled](https://img.shields.io/badge/transition-enabled-green.svg?style=flat-square")
 
 * Default: Number.MAX_SAFE_INTEGER
 
@@ -111,24 +110,31 @@ The maximum path width in pixels. This prop can be used to prevent the path from
 
 Type of joint. If `true`, draw round joints. Otherwise draw miter joints.
 
-##### `miterLimit` (Number, optional)
+##### `billboard` (Boolean, optional)
+
+* Default: `false`
+
+If `true`, extrude the path in screen space (width always faces the camera).
+If `false`, the width always faces up.
+
+##### `miterLimit` (Number, optional) ![transition-enabled](https://img.shields.io/badge/transition-enabled-green.svg?style=flat-square")
 
 * Default: `4`
 
 The maximum extent of a joint in ratio to the stroke width.
 Only works if `rounded` is `false`.
 
-##### `fp64` (Boolean, optional)
+##### `_pathType` (Object, optional)
 
-* Default: `false`
+* Default: `null`
 
-Whether the layer should be rendered in high-precision 64-bit mode. Note that since deck.gl v6.1, the default 32-bit projection uses a hybrid mode that matches 64-bit precision with significantly better performance.
+> Note: This prop is experimental
 
-##### `dashJustified` (Boolean, optional)
+One of `null`, `'loop'` or `'open'`.
 
-* Default: `false`
+If `'loop'` or `'open'`, will skip normalizing the coordinates returned by `getPath` and instead assume all paths are to be loops or open paths. Disabling normalization improves performance during data update, but makes the layer prone to error in case the data is malformed. It is only recommended when you use this layer with preprocessed static data or validation on the backend.
 
-Only effective if `getDashArray` is specified. If `true`, adjust gaps for the dashes to align at both ends.
+When normalization is disabled, paths must be specified in the format of flat array. Open paths must contain at least 2 vertices and closed paths must contain at least 3 vertices. See `getPath` below for details.
 
 ### Data Accessors
 
@@ -169,15 +175,66 @@ The width of each path, in units specified by `widthUnits` (default meters).
 * If a number is provided, it is used as the width for all paths.
 * If a function is provided, it is called on each path to retrieve its width.
 
-##### `getDashArray` ([Function](/docs/developer-guide/using-layers.md#accessors)|Array, optional)
 
-* Default: `null`
+## Use binary attributes
 
-The dash array to draw each path with: `[dashSize, gapSize]` relative to the width of the path.
+This section is about the special requirements when [supplying attributes directly](/docs/developer-guide/performance.md#supply-attributes-directly) to a `PathLayer`.
 
-* If an array is provided, it is used as the dash array for all paths.
-* If a function is provided, it is called on each path to retrieve its dash array. Return `[0, 0]` to draw the path in solid line.
-* If this accessor is not specified, all paths are drawn as solid lines.
+Because each path has a different number of vertices, when `data.attributes.getPath` is supplied, the layer also requires an array `data.startIndices` that describes the vertex index at the start of each path. For example, if there are 3 paths of 2, 3, and 4 vertices each, `startIndices` should be `[0, 2, 5, 9]`.
+
+Additionally, all other attributes (`getColor`, `getWidth`, etc.), if supplied, must contain the same layout (number of vertices) as the `getPath` buffer.
+
+To truly realize the performance gain from using binary data, the app likely wants to skip all data processing in this layer. Specify the `_pathType` prop to skip normalization.
+
+Example use case:
+
+```js
+// USE PLAIN JSON OBJECTS
+const PATH_DATA = [
+  {
+    path: [[-122.4, 37.7], [-122.5, 37.8], [-122.6, 37.85]],
+    name: 'Richmond - Millbrae',
+    color: [255, 0, 0]
+  },
+  ...
+];
+
+new PathLayer({
+  data: PATH_DATA,
+  getPath: d => d.path,
+  getColor: d => d.color
+})
+```
+
+Convert to using binary attributes:
+
+```js
+// USE BINARY
+// Flatten the path vertices
+// [-122.4, 37.7, -122.5, 37.8, -122.6, 37.85, ...]
+const positions = new Float64Array(PATH_DATA.map(d => d.path).flat(2));
+// The color attribute must supply one color for each vertex
+// [255, 0, 0, 255, 0, 0, 255, 0, 0, ...]
+const colors = new Uint8Array(PATH_DATA.map(d => d.path.map(_ => d.color)).flat(2));
+// The "layout" that tells PathLayer where each path starts
+const startIndices = new Uint16Array(PATH_DATA.reduce((acc, d) => {
+  const lastIndex = acc[acc.length - 1];
+  acc.push(lastIndex + d.path.length);
+  return acc;
+}, [0]));
+
+new PathLayer({
+  data: {
+    length: PATH_DATA.length,
+    startIndices: startIndices, // this is required to render the paths correctly!
+    attributes: {
+      getPath: {value: positions, size: 2},
+      getColor: {value: colors, size: 3}
+    }
+  },
+  _pathType: 'open' // this instructs the layer to skip normalization and use the binary as-is
+})
+```
 
 ## Source
 

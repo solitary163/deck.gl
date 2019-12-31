@@ -18,10 +18,9 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
-import {Layer, createIterable} from '@deck.gl/core';
+import {Layer, project32, picking} from '@deck.gl/core';
 import GL from '@luma.gl/constants';
-import {Model, Geometry, fp64} from '@luma.gl/core';
-const {fp64LowPart} = fp64;
+import {Model, Geometry} from '@luma.gl/core';
 
 import vs from './scatterplot-layer-vertex.glsl';
 import fs from './scatterplot-layer-fragment.glsl';
@@ -39,7 +38,6 @@ const defaultProps = {
   lineWidthMaxPixels: {type: 'number', min: 0, value: Number.MAX_SAFE_INTEGER},
 
   stroked: false,
-  fp64: false,
   filled: true,
 
   getPosition: {type: 'accessor', value: x => x.position},
@@ -56,21 +54,17 @@ const defaultProps = {
 
 export default class ScatterplotLayer extends Layer {
   getShaders(id) {
-    const projectModule = this.use64bitProjection() ? 'project64' : 'project32';
-    return {vs, fs, modules: [projectModule, 'picking']};
+    return super.getShaders({vs, fs, modules: [project32, picking]});
   }
 
   initializeState() {
     this.getAttributeManager().addInstanced({
       instancePositions: {
         size: 3,
+        type: GL.DOUBLE,
+        fp64: this.use64bitPositions(),
         transition: true,
         accessor: 'getPosition'
-      },
-      instancePositions64xyLow: {
-        size: 2,
-        accessor: 'getPosition',
-        update: this.calculateInstancePositions64xyLow
       },
       instanceRadius: {
         size: 1,
@@ -79,15 +73,17 @@ export default class ScatterplotLayer extends Layer {
         defaultValue: 1
       },
       instanceFillColors: {
-        size: 4,
+        size: this.props.colorFormat.length,
         transition: true,
+        normalized: true,
         type: GL.UNSIGNED_BYTE,
         accessor: 'getFillColor',
         defaultValue: [0, 0, 0, 255]
       },
       instanceLineColors: {
-        size: 4,
+        size: this.props.colorFormat.length,
         transition: true,
+        normalized: true,
         type: GL.UNSIGNED_BYTE,
         accessor: 'getLineColor',
         defaultValue: [0, 0, 0, 255]
@@ -103,7 +99,7 @@ export default class ScatterplotLayer extends Layer {
 
   updateState({props, oldProps, changeFlags}) {
     super.updateState({props, oldProps, changeFlags});
-    if (props.fp64 !== oldProps.fp64) {
+    if (changeFlags.extensionsChanged) {
       const {gl} = this.context;
       if (this.state.model) {
         this.state.model.delete();
@@ -127,22 +123,20 @@ export default class ScatterplotLayer extends Layer {
       lineWidthMaxPixels
     } = this.props;
 
-    const widthMultiplier =
-      lineWidthUnits === 'pixels' ? viewport.distanceScales.metersPerPixel[2] : 1;
+    const widthMultiplier = lineWidthUnits === 'pixels' ? viewport.metersPerPixel : 1;
 
     this.state.model
-      .setUniforms(
-        Object.assign({}, uniforms, {
-          stroked: stroked ? 1 : 0,
-          filled,
-          radiusScale,
-          radiusMinPixels,
-          radiusMaxPixels,
-          lineWidthScale: lineWidthScale * widthMultiplier,
-          lineWidthMinPixels,
-          lineWidthMaxPixels
-        })
-      )
+      .setUniforms(uniforms)
+      .setUniforms({
+        stroked: stroked ? 1 : 0,
+        filled,
+        radiusScale,
+        radiusMinPixels,
+        radiusMaxPixels,
+        lineWidthScale: lineWidthScale * widthMultiplier,
+        lineWidthMinPixels,
+        lineWidthMaxPixels
+      })
       .draw();
   }
 
@@ -161,31 +155,9 @@ export default class ScatterplotLayer extends Layer {
             positions: {size: 3, value: new Float32Array(positions)}
           }
         }),
-        isInstanced: true,
-        shaderCache: this.context.shaderCache
+        isInstanced: true
       })
     );
-  }
-
-  calculateInstancePositions64xyLow(attribute, {startRow, endRow}) {
-    const isFP64 = this.use64bitPositions();
-    attribute.constant = !isFP64;
-
-    if (!isFP64) {
-      attribute.value = new Float32Array(2);
-      return;
-    }
-
-    const {data, getPosition} = this.props;
-    const {value, size} = attribute;
-    let i = startRow * size;
-    const {iterable, objectInfo} = createIterable(data, startRow, endRow);
-    for (const object of iterable) {
-      objectInfo.index++;
-      const position = getPosition(object, objectInfo);
-      value[i++] = fp64LowPart(position[0]);
-      value[i++] = fp64LowPart(position[1]);
-    }
   }
 }
 

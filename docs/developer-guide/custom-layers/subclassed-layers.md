@@ -12,10 +12,23 @@ good technique to add it.
 ```js
 // Example to add per-segment color to PathLayer
 import {PathLayer} from '@deck.gl/layers';
+import GL from '@luma.gl/constants';
 
-// Accessor: `getColor` (Function, optional)
+// Allow accessor: `getColor` (Function, optional)
 // Returns an color (array of numbers, RGBA) or array of colors (array of arrays).
 export default class MultiColorPathLayer extends PathLayer {
+  initializeState() {
+    super.initializeState();
+    this.getAttributeManager().addInstanced({
+      instanceColors: {
+        size: 4,
+        type: GL.UNSIGNED_BYTE,
+        normalized: true,
+        update: this.calculateColors
+      }
+    })
+  }
+
   calculateColors(attribute) {
     const {data, getPath, getColor} = this.props;
     const {value} = attribute;
@@ -60,6 +73,7 @@ returns the shaders and modules used by the layer in an object:
 * `vs`: string, GLSL source of the vertex shader
 * `fs`: string, GLSL source of the fragment shader
 * `modules`: Array, list of shader modules to be used
+* `inject`: Object, map from injection points to custom GLSL code to be injected
 
 Read about [writing your own shaders](/docs/developer-guide/custom-layers/writing-shaders.md).
 
@@ -192,7 +206,7 @@ attribute vec3 positions;
 attribute vec3 instanceNormals;
 attribute vec4 instanceColors;
 attribute vec3 instancePositions;
-attribute vec2 instancePositions64xyLow;
+attribute vec3 instancePositions64Low;
 attribute vec3 instancePickingColors;
 
 /* New attribute */
@@ -207,7 +221,7 @@ void main(void) {
   unitPosition = positions.xy;
 
   vec4 position_commonspace;
-  gl_Position = project_position_to_clipspace(instancePositions, instancePositions64xyLow, vec3(0.), position_commonspace);
+  gl_Position = project_position_to_clipspace(instancePositions, instancePositions64Low, vec3(0.), position_commonspace);
   /* replaced uniform 'radiusPixels' with 'instanceRadiusPixels' */
   gl_Position.xy += project_pixel_size_to_clipspace(positions.xy * instanceRadiusPixels);
 
@@ -219,3 +233,8 @@ void main(void) {
 }
 `;
 ```
+
+## Layer Extensions
+
+Sometimes we need to subclass multiple layers to add similar functionalities.
+[Layer extension](/docs/api-reference/extensions/overview.md) is a way to generalize, reuse, and share subclassed layer code. [Read on](/docs/developer-guide/custom-layers/layer-extensions.md) about how to package up a subclassed layer code into a layer extension.

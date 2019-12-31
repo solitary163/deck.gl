@@ -3,7 +3,8 @@
 import React, {Component} from 'react';
 import {render} from 'react-dom';
 import {StaticMap} from 'react-map-gl';
-import DeckGL, {TextLayer} from 'deck.gl';
+import DeckGL from '@deck.gl/react';
+import {TextLayer} from '@deck.gl/layers';
 import GL from '@luma.gl/constants';
 
 // Set your mapbox token here
@@ -18,7 +19,7 @@ const SECONDS_PER_DAY = 24 * 60 * 60;
 const TIME_WINDOW = 2;
 const TEXT_COLOR = [255, 200, 0];
 
-export const INITIAL_VIEW_STATE = {
+const INITIAL_VIEW_STATE = {
   latitude: 39.1,
   longitude: -94.57,
   zoom: 3.8,
@@ -27,7 +28,7 @@ export const INITIAL_VIEW_STATE = {
   bearing: 0
 };
 
-export class App extends Component {
+export default class App extends Component {
   constructor(props) {
     super(props);
 
@@ -102,27 +103,24 @@ export class App extends Component {
   }
 
   render() {
-    const {viewState, controller = true, baseMap = true} = this.props;
+    const {mapStyle = MAPBOX_STYLE} = this.props;
 
     return (
       <DeckGL
         layers={this._renderLayers()}
         initialViewState={INITIAL_VIEW_STATE}
-        viewState={viewState}
-        controller={controller}
+        controller={true}
         parameters={{
           blendFunc: [GL.SRC_ALPHA, GL.ONE, GL.ONE_MINUS_DST_ALPHA, GL.ONE],
           blendEquation: GL.FUNC_ADD
         }}
       >
-        {baseMap && (
-          <StaticMap
-            reuseMaps
-            mapStyle={MAPBOX_STYLE}
-            preventStyleDiffing={true}
-            mapboxApiAccessToken={MAPBOX_TOKEN}
-          />
-        )}
+        <StaticMap
+          reuseMaps
+          mapStyle={mapStyle}
+          preventStyleDiffing={true}
+          mapboxApiAccessToken={MAPBOX_TOKEN}
+        />
       </DeckGL>
     );
   }

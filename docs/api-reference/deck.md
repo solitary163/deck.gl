@@ -49,7 +49,42 @@ The array of deck.gl layers to be rendered. This array is expected to be an arra
 
 ##### `layerFilter` (Function)
 
-Optionally takes a function `({layer, viewport, isPicking}) => Boolean` that is called before a layer is rendered. Gives the application an opportunity to filter out layers from the layer list during either rendering or picking. Filtering can be done per viewport or per layer or both. This enables techniques like adding helper layers that work as masks during picking but do not show up during rendering. All the lifecycle methods are still triggered even a if a layer is filtered out using this prop.
+Default: `null`
+
+If supplied, will be called before a layer is drawn to determine whether it should be rendered. This gives the application an opportunity to filter out layers from the layer list during either rendering or picking. Filtering can be done per viewport or per layer or both. This enables techniques like adding helper layers that work as masks during picking but do not show up during rendering.
+
+```js
+new Deck({
+  // ...
+  layerFilter: ({layer, viewport}) => {
+    if (viewport.id !== 'minimap' && layer.id === 'geofence') {
+      // only display geofence in the minimap
+      return false;
+    }
+    return true;
+  }
+}
+```
+
+Notes:
+
+- `layerFilter` does not override the visibility defined by the layer's `visible` and `pickable` props.
+- All the lifecycle methods are still triggered even a if a layer is filtered out using this prop.
+
+Arguments:
+
+- `layer` (Layer) - the layer to be drawn
+- `viewport` (Viewport) - the current viewport
+- `isPicking` (Boolean) - whether this is a picking pass
+- `renderPass` (String) - the name of the current render pass. Some standard passes are:
+  + `'screen'` - drawing to screen
+  + `'picking:hover'` - drawing to offscreen picking buffer due to pointer move
+  + `'picking:query'` - drawing to offscreen picking buffer due to user-initiated query, e.g. calling `deck.pickObject`.
+  + `'shadow'` - drawing to shadow map
+
+Returns:
+
+`true` if the layer should be drawn.
 
 ##### `getCursor` (Function)
 
@@ -138,21 +173,62 @@ Canvas ID to allow style customization in CSS.
 
 ##### `style` (Object, optional)
 
-Css styles for the deckgl-canvas.
+CSS styles for the deckgl-canvas.
+
+##### `touchAction` (String, optional)
+
+Allow browser default touch actions. See [hammer.js doc](http://hammerjs.github.io/touch-action/).
+
+Default: `none`.
+
+By default, the deck canvas captures all touch interactions. This prop is useful for mobile applications to unblock default scrolling behavior. For example, use the combination `controller: {dragPan: false}` and `touchAction: 'pan-y'` to allow vertical page scroll when dragging over the canvas.
 
 ##### `pickingRadius` (Number, optional)
 
 Extra pixels around the pointer to include while picking. This is helpful when rendered objects are difficult to target, for example irregularly shaped icons, small moving circles or interaction by touch. Default `0`.
 
-##### `useDevicePixels` (Boolean, optional)
+#### `getTooltip` (Function, optional)
 
-When true, device's full resolution will be used for rendering, this value can change per frame, like when moving windows between screens or when changing zoom level of the browser.
+Callback that takes a hovered-over point and renders a tooltip. If the prop is not specified, the tooltip is hidden.
+
+Callback arguments:
+
+* `info` - the [picking info](/docs/developer-guide/interactivity.md#the-picking-info-object) describing the object being hovered.
+
+If the callback returns `null`, the tooltip is hidden, with the CSS `display` property set to `none`.
+If the callback returns a string, that string is rendered in a tooltip with the default CSS styling described below.
+Otherwise, the callback can return an object with the following fields:
+
+* `text` (String, optional) - Specifies the `innerText` attribute of the tooltip.
+* `html` (String, optional) - Specifies the `innerHTML` attribute of the tooltip. Note that this will override the specified `innerText`.
+* `className` (String, optional) - Class name to attach to the tooltip element. The element has the default class name of `deck-tooltip`.
+* `style` (Object, optional) - An object of CSS styles to apply to the tooltip element, which can override the default styling.
+
+By default, the tooltip has the following CSS style:
+
+```css
+z-index: 1;
+position: absolute;
+color: #a0a7b4;
+background-color: #29323c;
+padding: 10px;
+```
+
+##### `useDevicePixels` (Boolean|Number, optional)
+
+Controls the resolution of drawing buffer used for rendering.
+
+* `true`: `Device (physical) pixels` resolution is used for rendering, this resolution is defined by `window.devicePixelRatio`. On Retina/HD systems this resolution is usually twice as big as `CSS pixels` resolution.
+* `false`: `CSS pixels` resolution (equal to the canvas size) is used for rendering.
+* `Number` (Experimental): Specified Number is used as a custom ratio (drawing buffer resolution to `CSS pixel` resolution) to determine drawing buffer size, a value less than `one` uses resolution smaller than `CSS pixels`, gives better performance but produces blurry images, a value greater than `one` uses resolution bigger than CSS pixels resolution (canvas size), produces sharp images but at a lower performance.
 
 Default value is `true`.
 
 Note:
 
-* Consider setting to `false` unless you require high resolution, as it affects rendering performance.
+* Consider setting to `false` or to a Number less than `one` if better rendering performance is needed.
+
+* When it is set to a high Number (like, 4 or more), it is possible to hit the system limit for allocating drawing buffer, such cases will log a warning and fallback to system allowed resolution.
 
 ##### `gl` (Object, optional)
 
@@ -161,6 +237,10 @@ gl context, will be autocreated if not supplied.
 ##### `glOptions` (Object, optional)
 
 Additional options used when creating the WebGLContext. See [WebGL context attributes](https://developer.mozilla.org/en-US/docs/Web/API/HTMLCanvasElement/getContext).
+
+##### `_framebuffer` (Object, optional)
+
+(Experimental) Render to a custom frame buffer other than to screen.
 
 ##### `parameters` (Object, optional)
 
@@ -197,7 +277,7 @@ Forces deck.gl to redraw layers every animation frame. Normally deck.gl layers a
 
 ##### `onWebGLInitialized` (Function, optional)
 
-Callback, called once the WebGL context has been initiated
+Called once the WebGL context has been initiated.
 
 Callback arguments:
 
@@ -207,9 +287,16 @@ Callback arguments:
 
 The `onViewStateChange` callback is fired when the user has interacted with the deck.gl canvas, e.g. using mouse, touch or keyboard.
 
-`onViewStateChange({viewState})`
+`onViewStateChange({viewState, interactionState, oldViewState})`
 
-* `viewState` - An updated [view state](/docs/developer-guide/views.md) object containing parameters such as `longitude`, `latitude`, `zoom` etc.
+* `viewState` - An updated [view state](/docs/developer-guide/views.md) object.
+* `interactionState` - Describes the interaction that invoked the view state change. May include the following fields:
+  + `inTransition` (Boolean)
+  + `isDragging` (Boolean)
+  + `isPanning` (Boolean)
+  + `isRotating` (Boolean)
+  + `isZooming` (Boolean)
+* `oldViewState` - The previous [view state](/docs/developer-guide/views.md) object.
 
 Returns:
 
@@ -217,45 +304,45 @@ Returns:
 
 ##### `onHover` (Function, optional)
 
-Callback - called when the pointer moves over the canvas.
+Called when the pointer moves over the canvas.
 
-Callback Arguments:
+Callback arguments:
 
-* `info` - the [picking info](/docs/developer-guide/interactivity.md#the-picking-info-object) describing the object being dragged.
+* `info` - the [picking info](/docs/developer-guide/interactivity.md#the-picking-info-object) describing the object being hovered.
 * `event` - the original gesture event
 
 ##### `onClick` (Function, optional)
 
-Callback - called when clicking on the canvas.
+Called when clicking on the canvas.
 
-Callback Arguments:
+Callback arguments:
 
-* `info` - the [picking info](/docs/developer-guide/interactivity.md#the-picking-info-object) describing the object being dragged.
+* `info` - the [picking info](/docs/developer-guide/interactivity.md#the-picking-info-object) describing the object being clicked.
 * `event` - the original gesture event
 
 ##### `onDragStart` (Function, optional)
 
-Callback - called when the user starts dragging on the canvas.
+Called when the user starts dragging on the canvas.
 
-Callback Arguments:
+Callback arguments:
 
 * `info` - the [picking info](/docs/developer-guide/interactivity.md#the-picking-info-object) describing the object being dragged.
 * `event` - the original gesture event
 
 ##### `onDrag` (Function, optional)
 
-Callback - called when dragging the canvas.
+Called when dragging the canvas.
 
-Callback Arguments:
+Callback arguments:
 
 * `info` - the [picking info](/docs/developer-guide/interactivity.md#the-picking-info-object) describing the object being dragged.
 * `event` - the original gesture event
 
 ##### `onDragEnd` (Function, optional)
 
-Callback - called when the user releases from dragging the canvas.
+Called when the user releases from dragging the canvas.
 
-Callback Arguments:
+Callback arguments:
 
 * `info` - the [picking info](/docs/developer-guide/interactivity.md#the-picking-info-object) describing the object being dragged.
 * `event` - the original gesture event
@@ -263,7 +350,36 @@ Callback Arguments:
 
 ##### `onLoad` (Function, optional)
 
-Callback, called once after gl context and Deck components (`ViewManager`, `LayerManager`, etc) are created. Can be used to trigger viewport transitions.
+Called once after gl context and Deck components (`ViewManager`, `LayerManager`, etc) are created. It is safe to trigger viewport transitions after this event.
+
+
+##### `onResize` (Function, optional)
+
+Called when the canvas resizes.
+
+Callback arguments:
+
+* `size`
+  - `width` (Number) - the new width of the deck canvas, in client pixels
+  - `height` (Number) - the new height of the deck canvas, in client pixels
+
+
+##### `onBeforeRender` (Function, optional)
+
+Called just before the canvas rerenders.
+
+Callback arguments:
+
+* `gl` - the WebGL context.
+
+
+##### `onAfterRender` (Function, optional)
+
+Called right after the canvas rerenders.
+
+Callback arguments:
+
+* `gl` - the WebGL context.
 
 
 ##### `_onMetrics` (Function, optional) **Experimental**
@@ -322,6 +438,7 @@ deck.pickObject({x, y, radius, layerIds})
 * `y` (Number) - y position in pixels
 * `radius` (Number, optional) - radius of tolerance in pixels. Default `0`.
 * `layerIds` (Array, optional) - a list of layer ids to query from. If not specified, then all pickable and visible layers are queried.
+* `unproject3D` (Boolean, optional) - if `true`, `info.coordinate` will be a 3D point by unprojecting the `x, y` screen coordinates onto the picked geometry. Default `false`.
 
 Returns:
 
@@ -341,6 +458,7 @@ deck.pickMultipleObjects({x, y, radius, layerIds, depth})
 * `radius`=`0` (Number, optional) - radius of tolerance in pixels.
 * `layerIds`=`null` (Array, optional) - a list of layer ids to query from. If not specified, then all pickable and visible layers are queried.
 * `depth`=`10` - Specifies the max
+* `unproject3D` (Boolean, optional) - if `true`, `info.coordinate` will be a 3D point by unprojecting the `x, y` screen coordinates onto the picked geometry. Default `false`.
 
 Returns:
 
@@ -375,6 +493,27 @@ Notes:
 
 * The query methods are designed to quickly find objects by utilizing the picking buffer.
 * The query methods offer more flexibility for developers to handle events compared to the built-in hover and click callbacks.
+
+
+## Member Variables
+
+#### metrics
+
+A map of various performance statistics for the last 60 frames of rendering. Metrics gathered in deck.gl are the following:
+- 'fps': average number of frames rendered per second
+- 'updateAttributesTime': time spent updating layer attributes
+- 'setPropsTime': time spent setting deck properties
+- 'framesRedrawn': number of times the scene was rendered
+- 'pickTime': total time spent on picking operations
+- 'pickCount': number of times a pick operation was performed
+- 'gpuTime': total time spent on GPU processing
+- 'gpuTimePerFrame': average time spent on GPU processing per frame
+- 'cpuTime': total time spent on CPU processing
+- 'cpuTimePerFrame': average time spent on CPU processing per frame
+- 'bufferMemory': total GPU memory allocated for buffers
+- 'textureMemory': total GPU memory allocated for textures
+- 'renderbufferMemory': total GPU memory allocated for renderbuffers
+- 'gpuMemory': total allocated GPU memory
 
 
 ## Remarks

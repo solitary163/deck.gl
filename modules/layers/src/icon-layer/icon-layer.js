@@ -17,11 +17,9 @@
 // LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
-import {Layer, createIterable} from '@deck.gl/core';
+import {Layer, project32, picking} from '@deck.gl/core';
 import GL from '@luma.gl/constants';
-import {Model, Geometry, fp64} from '@luma.gl/core';
-
-const {fp64LowPart} = fp64;
+import {Model, Geometry} from '@luma.gl/core';
 
 import vs from './icon-layer-vertex.glsl';
 import fs from './icon-layer-fragment.glsl';
@@ -52,14 +50,14 @@ const DEFAULT_COLOR = [0, 0, 0, 255];
  * @param {func} props.getAngle - returns rotating angle (in degree) of the icon.
  */
 const defaultProps = {
-  iconAtlas: null,
+  iconAtlas: {type: 'object', value: null, async: true},
   iconMapping: {type: 'object', value: {}, async: true},
   sizeScale: {type: 'number', value: 1, min: 0},
-  fp64: false,
   billboard: true,
   sizeUnits: 'pixels',
   sizeMinPixels: {type: 'number', min: 0, value: 0}, //  min point radius in pixels
   sizeMaxPixels: {type: 'number', min: 0, value: Number.MAX_SAFE_INTEGER}, // max point radius in pixels
+  alphaCutoff: {type: 'number', value: 0.05, min: 0, max: 1},
 
   getPosition: {type: 'accessor', value: x => x.position},
   getIcon: {type: 'accessor', value: x => x.icon},
@@ -70,8 +68,7 @@ const defaultProps = {
 
 export default class IconLayer extends Layer {
   getShaders() {
-    const projectModule = this.use64bitProjection() ? 'project64' : 'project32';
-    return {vs, fs, modules: [projectModule, 'picking']};
+    return super.getShaders({vs, fs, modules: [project32, picking]});
   }
 
   initializeState() {
@@ -84,13 +81,10 @@ export default class IconLayer extends Layer {
     attributeManager.addInstanced({
       instancePositions: {
         size: 3,
+        type: GL.DOUBLE,
+        fp64: this.use64bitPositions(),
         transition: true,
         accessor: 'getPosition'
-      },
-      instancePositions64xyLow: {
-        size: 2,
-        accessor: 'getPosition',
-        update: this.calculateInstancePositions64xyLow
       },
       instanceSizes: {
         size: 1,
@@ -98,17 +92,18 @@ export default class IconLayer extends Layer {
         accessor: 'getSize',
         defaultValue: 1
       },
-      instanceOffsets: {size: 2, accessor: 'getIcon', update: this.calculateInstanceOffsets},
-      instanceIconFrames: {size: 4, accessor: 'getIcon', update: this.calculateInstanceIconFrames},
+      instanceOffsets: {size: 2, accessor: 'getIcon', transform: this.getInstanceOffset},
+      instanceIconFrames: {size: 4, accessor: 'getIcon', transform: this.getInstanceIconFrame},
       instanceColorModes: {
         size: 1,
         type: GL.UNSIGNED_BYTE,
         accessor: 'getIcon',
-        update: this.calculateInstanceColorMode
+        transform: this.getInstanceColorMode
       },
       instanceColors: {
-        size: 4,
+        size: this.props.colorFormat.length,
         type: GL.UNSIGNED_BYTE,
+        normalized: true,
         transition: true,
         accessor: 'getColor',
         defaultValue: DEFAULT_COLOR
@@ -132,9 +127,10 @@ export default class IconLayer extends Layer {
     const {iconAtlas, iconMapping, data, getIcon} = props;
 
     let iconMappingChanged = false;
+    const prePacked = iconAtlas || this.internalState.isAsyncPropLoading('iconAtlas');
 
     // prepacked iconAtlas from user
-    if (iconAtlas) {
+    if (prePacked) {
       if (oldProps.iconAtlas !== props.iconAtlas) {
         iconManager.setProps({iconAtlas, autoPacking: false});
       }
@@ -163,7 +159,7 @@ export default class IconLayer extends Layer {
       attributeManager.invalidate('instanceColorModes');
     }
 
-    if (props.fp64 !== oldProps.fp64) {
+    if (changeFlags.extensionsChanged) {
       const {gl} = this.context;
       if (this.state.model) {
         this.state.model.delete();
@@ -181,22 +177,22 @@ export default class IconLayer extends Layer {
   }
 
   draw({uniforms}) {
-    const {sizeScale, sizeMinPixels, sizeMaxPixels, sizeUnits, billboard} = this.props;
+    const {sizeScale, sizeMinPixels, sizeMaxPixels, sizeUnits, billboard, alphaCutoff} = this.props;
     const {iconManager} = this.state;
     const {viewport} = this.context;
 
     const iconsTexture = iconManager.getTexture();
-    if (iconsTexture) {
+    if (iconsTexture && iconsTexture.loaded) {
       this.state.model
         .setUniforms(
           Object.assign({}, uniforms, {
             iconsTexture,
             iconsTextureDim: [iconsTexture.width, iconsTexture.height],
-            sizeScale:
-              sizeScale * (sizeUnits === 'pixels' ? viewport.distanceScales.metersPerPixel[2] : 1),
+            sizeScale: sizeScale * (sizeUnits === 'pixels' ? viewport.metersPerPixel : 1),
             sizeMinPixels,
             sizeMaxPixels,
-            billboard
+            billboard,
+            alphaCutoff
           })
         )
         .draw();
@@ -204,7 +200,9 @@ export default class IconLayer extends Layer {
   }
 
   _getModel(gl) {
-    const positions = [-1, -1, 0, -1, 1, 0, 1, 1, 0, 1, -1, 0];
+    // The icon-layer vertex shader uses 2d positions
+    // specifed via: attribute vec2 positions;
+    const positions = [-1, -1, -1, 1, 1, 1, 1, -1];
 
     return new Model(
       gl,
@@ -213,11 +211,15 @@ export default class IconLayer extends Layer {
         geometry: new Geometry({
           drawMode: GL.TRIANGLE_FAN,
           attributes: {
-            positions: new Float32Array(positions)
+            // The size must be explicitly passed here otherwise luma.gl
+            // will default to assuming that positions are 3D (x,y,z)
+            positions: {
+              size: 2,
+              value: new Float32Array(positions)
+            }
           }
         }),
-        isInstanced: true,
-        shaderCache: this.context.shaderCache
+        isInstanced: true
       })
     );
   }
@@ -226,69 +228,19 @@ export default class IconLayer extends Layer {
     this.setNeedsRedraw();
   }
 
-  calculateInstancePositions64xyLow(attribute) {
-    const isFP64 = this.use64bitPositions();
-    attribute.constant = !isFP64;
-
-    if (!isFP64) {
-      attribute.value = new Float32Array(2);
-      return;
-    }
-
-    const {data, getPosition} = this.props;
-    const {value} = attribute;
-    let i = 0;
-    const {iterable, objectInfo} = createIterable(data);
-    for (const object of iterable) {
-      objectInfo.index++;
-      const position = getPosition(object, objectInfo);
-      value[i++] = fp64LowPart(position[0]);
-      value[i++] = fp64LowPart(position[1]);
-    }
+  getInstanceOffset(icon) {
+    const rect = this.state.iconManager.getIconMapping(icon);
+    return [rect.width / 2 - rect.anchorX || 0, rect.height / 2 - rect.anchorY || 0];
   }
 
-  calculateInstanceOffsets(attribute, {startRow, endRow}) {
-    const {data} = this.props;
-    const {iconManager} = this.state;
-    const {value, size} = attribute;
-    let i = startRow * size;
-    const {iterable, objectInfo} = createIterable(data, startRow, endRow);
-    for (const object of iterable) {
-      objectInfo.index++;
-      const rect = iconManager.getIconMapping(object, objectInfo);
-      value[i++] = rect.width / 2 - rect.anchorX || 0;
-      value[i++] = rect.height / 2 - rect.anchorY || 0;
-    }
+  getInstanceColorMode(icon) {
+    const mapping = this.state.iconManager.getIconMapping(icon);
+    return mapping.mask ? 1 : 0;
   }
 
-  calculateInstanceColorMode(attribute, {startRow, endRow}) {
-    const {data} = this.props;
-    const {iconManager} = this.state;
-    const {value, size} = attribute;
-    let i = startRow * size;
-    const {iterable, objectInfo} = createIterable(data, startRow, endRow);
-    for (const object of iterable) {
-      objectInfo.index++;
-      const mapping = iconManager.getIconMapping(object, objectInfo);
-      const colorMode = mapping.mask;
-      value[i++] = colorMode ? 1 : 0;
-    }
-  }
-
-  calculateInstanceIconFrames(attribute, {startRow, endRow}) {
-    const {data} = this.props;
-    const {iconManager} = this.state;
-    const {value, size} = attribute;
-    let i = startRow * size;
-    const {iterable, objectInfo} = createIterable(data, startRow, endRow);
-    for (const object of iterable) {
-      objectInfo.index++;
-      const rect = iconManager.getIconMapping(object, objectInfo);
-      value[i++] = rect.x || 0;
-      value[i++] = rect.y || 0;
-      value[i++] = rect.width || 0;
-      value[i++] = rect.height || 0;
-    }
+  getInstanceIconFrame(icon) {
+    const rect = this.state.iconManager.getIconMapping(icon);
+    return [rect.x || 0, rect.y || 0, rect.width || 0, rect.height || 0];
   }
 }
 

@@ -23,8 +23,7 @@ matrix:
       install:
         - yarn bootstrap
       node_js:
-        - 8.9.4
-        - 10.4.0
+        - 10.16.0
       before_script:
         - export DISPLAY=:99.0; sh -e /etc/init.d/xvfb start
         - ulimit -c unlimited -S       # enable core dumps
@@ -35,18 +34,27 @@ matrix:
 
     - language: python
       dist: precise
+      os: linux
+      group: stable
+      sudo: required
+      dist: trusty
+      addons:
+        apt:
+          sources:
+          - ubuntu-toolchain-r-test
       before_install:
         - cd bindings/python/pydeck
       python:
-        - '3.5'
-        - '2.7'
+        - "3.5"
+        - "2.7"
       cache:
         pip: true
         directories:
           - ~/.npm  # NPM cache
       install:
-        - sudo apt-get update
         - pip install -r requirements.txt
         - pip install -r requirements-dev.txt
-        - pip install -e .
+        - nvm install 10.16.0
+        - nvm use 10.16.0
+        - pip install -e . --install-option "--build_all"
       script: pytest --cov=pydeck

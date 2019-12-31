@@ -20,8 +20,6 @@
 
 import assert from '../utils/assert';
 import {deepEqual} from '../utils/deep-equal';
-import View from '../views/view';
-import Viewport from '../viewports/viewport';
 import log from '../utils/log';
 import {flatten} from '../utils/flatten';
 
@@ -33,6 +31,7 @@ export default class ViewManager {
     this.height = 100;
     this.viewState = {};
     this.controllers = {};
+    this.timeline = props.timeline;
 
     this._viewports = []; // Generated viewports
     this._viewportMap = {};
@@ -78,13 +77,11 @@ export default class ViewManager {
   }
 
   // Checks each viewport for transition updates
-  updateViewStates(animationProps = {}) {
-    if ('time' in animationProps) {
-      for (const viewId in this.controllers) {
-        const controller = this.controllers[viewId];
-        if (controller) {
-          controller.updateTransition(animationProps.time);
-        }
+  updateViewStates() {
+    for (const viewId in this.controllers) {
+      const controller = this.controllers[viewId];
+      if (controller) {
+        controller.updateTransition();
       }
     }
   }
@@ -135,29 +132,6 @@ export default class ViewManager {
   }
 
   /**
-   * Projects xyz (possibly latitude and longitude) to pixel coordinates in window
-   * using viewport projection parameters
-   * - [longitude, latitude] to [x, y]
-   * - [longitude, latitude, Z] => [x, y, z]
-   * Note: By default, returns top-left coordinates for canvas/SVG type render
-   *
-   * @param {Array} lngLatZ - [lng, lat] or [lng, lat, Z]
-   * @param {Object} opts - options
-   * @param {Object} opts.topLeft=true - Whether projected coords are top left
-   * @return {Array} - [x, y] or [x, y, z] in top left coords
-   */
-  project(xyz, opts = {topLeft: true}) {
-    const viewports = this.getViewports();
-    for (let i = viewports.length - 1; i >= 0; --i) {
-      const viewport = viewports[i];
-      if (viewport.contains(xyz, opts)) {
-        return viewport.project(xyz, opts);
-      }
-    }
-    return null;
-  }
-
-  /**
    * Unproject pixel coordinates on screen onto world coordinates,
    * (possibly [lon, lat]) on map.
    * - [x, y] => [lng, lat]
@@ -169,10 +143,14 @@ export default class ViewManager {
    */
   unproject(xyz, opts) {
     const viewports = this.getViewports();
+    const pixel = {x: xyz[0], y: xyz[1]};
     for (let i = viewports.length - 1; i >= 0; --i) {
       const viewport = viewports[i];
-      if (viewport.containsPixel(xyz, opts)) {
-        return viewport.unproject(xyz);
+      if (viewport.containsPixel(pixel)) {
+        const p = xyz.slice();
+        p[0] -= viewport.x;
+        p[1] -= viewport.y;
+        return viewport.unproject(p, opts);
       }
     }
     return null;
@@ -231,10 +209,7 @@ export default class ViewManager {
   // Update the view descriptor list and set change flag if needed
   // Does not actually rebuild the `Viewport`s until `getViewports` is called
   _setViews(views) {
-    // DEPRECATED: Ensure any "naked" Viewports are wrapped in View instances
-    views = flatten(views, {filter: Boolean}).map(
-      view => (view instanceof Viewport ? new View({viewportInstance: view}) : view)
-    );
+    views = flatten(views, {filter: Boolean});
 
     const viewsChanged = this._diffViews(views, this.views);
     if (viewsChanged) {
@@ -254,7 +229,7 @@ export default class ViewManager {
 
       this.viewState = viewState;
     } else {
-      log.warn('setting null viewState')();
+      log.warn('missing `viewState` or `initialViewState`')();
     }
   }
 
@@ -273,6 +248,7 @@ export default class ViewManager {
     const controller = new Controller(
       Object.assign(
         {
+          timeline: this.timeline,
           eventManager: this._eventManager,
           // Set an internal callback that calls the prop callback if provided
           onViewStateChange: this._onViewStateChange.bind(this, props.id),
@@ -311,9 +287,12 @@ export default class ViewManager {
     const {width, height, views} = this;
 
     const oldControllers = this.controllers;
+    this._viewports = [];
     this.controllers = {};
 
-    this._viewports = views.map(view => {
+    // Create controllers in reverse order, so that views on top receive events first
+    for (let i = views.length; i--; ) {
+      const view = views[i];
       const viewState = this.getViewState(view);
       const viewport = view.makeViewport({width, height, viewState});
 
@@ -325,8 +304,8 @@ export default class ViewManager {
         oldControllers[view.id]
       );
 
-      return viewport;
-    });
+      this._viewports.unshift(viewport);
+    }
 
     // Remove unused controllers
     for (const id in oldControllers) {

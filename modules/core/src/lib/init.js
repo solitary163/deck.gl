@@ -18,8 +18,13 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
-import {global} from '../utils/globals';
+import {registerLoaders} from '@loaders.gl/core';
+import {ImageLoader} from '@loaders.gl/images';
+
+import {global} from 'probe.gl/env';
 import log from '../utils/log';
+import {register} from '../debug';
+import jsonLoader from '../utils/json-loader';
 
 // Version detection using babel plugin
 // Fallback for tests and SSR since global variable is defined by Webpack.
@@ -27,25 +32,31 @@ import log from '../utils/log';
 const version =
   typeof __VERSION__ !== 'undefined' ? __VERSION__ : global.DECK_VERSION || 'untranspiled source';
 
-const STARTUP_MESSAGE = 'set deck.log.priority=1 (or higher) to trace attribute updates';
+// Note: a `deck` object not created by deck.gl may exist in the global scope
+const existingVersion = global.deck && global.deck.VERSION;
 
-if (global.deck && global.deck.VERSION !== version) {
-  throw new Error(`deck.gl - multiple versions detected: ${global.deck.VERSION} vs ${version}`);
+if (existingVersion && existingVersion !== version) {
+  throw new Error(`deck.gl - multiple versions detected: ${existingVersion} vs ${version}`);
 }
 
-if (!global.deck) {
-  /* global console */
-  /* eslint-disable no-console */
-  log.log(0, `deck.gl ${version} - ${STARTUP_MESSAGE}`)();
+if (!existingVersion) {
+  // eslint-disable-next-line
+  if (process.env.NODE_ENV !== 'production') {
+    log.log(
+      0,
+      `deck.gl ${version} - set deck.log.level=1 (or higher) to trace attribute updates`
+    )();
+  }
 
-  global.deck = global.deck || {
+  global.deck = Object.assign(global.deck || {}, {
     VERSION: version,
     version,
-    log
-  };
+    log,
+    // experimental
+    _registerLoggers: register
+  });
+
+  registerLoaders([jsonLoader, ImageLoader]);
 }
 
-// TODO - Hack, remove when luma.gl 4.1.0-alpha.5 is published
-if (!console.table) {
-  console.table = () => {};
-}
+export default global.deck;

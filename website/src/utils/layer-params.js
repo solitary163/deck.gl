@@ -1,13 +1,12 @@
-const blackList = [
-  'coordinateSystem',
-  'modelMatrix'
-];
+const blackList = ['coordinateSystem', 'modelMatrix'];
+
+const ASYNC_ORIGINAL = Symbol.for('asyncPropOriginal');
 
 /* eslint-disable complexity */
 /*
  * infer parameter type from a prop
  */
-export function propToParam(key, value) {
+export function propToParam(key, propType, value) {
   if (blackList.indexOf(key) >= 0) {
     return null;
   }
@@ -18,38 +17,46 @@ export function propToParam(key, value) {
     value
   };
 
-  switch (typeof value) {
-  case 'boolean':
-    return {...param, type: 'checkbox'};
-  case 'number':
-    if (/pixels|width|height|size|scale|radius|limit/i.test(key)) {
-      param.max = 100;
-      param.step = 1;
-    } else {
-      param.max = 1;
-      param.step = 0.01;
+  const type = !propType || propType.type === 'unknown' ? typeof value : propType.type;
+
+  switch (type) {
+    case 'boolean':
+      return {...param, type: 'checkbox'};
+    case 'number':
+      param.min = propType && 'min' in propType ? propType.min : 0;
+      param.max = propType && 'max' in propType ? propType.max : 100;
+      return {...param, type: 'range', step: param.max === 100 ? 1 : 0.01};
+    case 'accessor': {
+      const result = {...param, type: 'function'};
+      const altValue = propType.value;
+      let altType = typeof altValue;
+      if (Array.isArray(altValue) && key.endsWith('Color')) {
+        altType = 'color';
+      }
+      if (altType === 'boolean' || altType === 'color') {
+        result.altType = altType;
+        result.altValue = altValue;
+      }
+      if (altType === 'number') {
+        result.altType = 'range';
+        result.altValue = altValue;
+        result.step = 1;
+        result.min = 0;
+        result.max = 100;
+      }
+      return result;
     }
-    return {...param, type: 'range', min: 0};
-  case 'function':
-    if (key.indexOf('get') === 0) {
-      // is accessor
-      return {...param, type: 'function'};
-    }
-    break;
-  case 'string':
-    if (/\.(png|jpg|jpeg|gif)/i.test(value)) {
-      return {...param, type: 'link'};
-    }
-    break;
-  case 'object':
-    if (/color/i.test(key) && value && Number.isFinite(value[0])) {
+    case 'color':
       return {...param, type: 'color'};
-    }
-    if (/mapping|domain|range/i.test(key)) {
-      return {...param, type: 'json'};
-    }
-    break;
-  default:
+    case 'object':
+      if (/mapping|domain|range/i.test(key)) {
+        return {...param, type: 'json'};
+      }
+      if (propType && propType.async) {
+        return {...param, type: 'link'};
+      }
+      break;
+    default:
   }
   return null;
 }
@@ -67,7 +74,12 @@ export function getLayerParams(layer, propParameters = {}) {
     if (propParameters[key]) {
       paramsArray.push({name: key, ...propParameters[key]});
     } else {
-      const param = propToParam(key, layer.props[key]);
+      const LAYER_PROPTYPES = layer.constructor._propTypes[key];
+      const param = propToParam(
+        key,
+        LAYER_PROPTYPES,
+        layer.props[ASYNC_ORIGINAL][key] || layer.props[key]
+      );
       if (param) {
         paramsArray.push(param);
       }

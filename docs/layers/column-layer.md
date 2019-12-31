@@ -2,7 +2,6 @@
 
 <p class="badges">
   <img src="https://img.shields.io/badge/@deck.gl/layers-lightgrey.svg?style=flat-square" alt="@deck.gl/layers" />
-  <img src="https://img.shields.io/badge/fp64-yes-blue.svg?style=flat-square" alt="64-bit" />
   <img src="https://img.shields.io/badge/lighting-yes-blue.svg?style=flat-square" alt="lighting" />
 </p>
 
@@ -10,7 +9,7 @@
 
 > This is the primitive layer rendered by [HexagonLayer](/docs/layers/hexagon-layer.md) after aggregation. Unlike the HexagonLayer, it renders one column for each data object.
 
-The ColumnLayer can be used to render a heatmap of vertical cylinders. It renders a tesselated regular polygon centered at each given position (a "disk"), and extrude it in 3d.
+The ColumnLayer can be used to render a heatmap of vertical cylinders. It renders a tessellated regular polygon centered at each given position (a "disk"), and extrude it in 3d.
 
 ```js
 import DeckGL from '@deck.gl/react';
@@ -34,7 +33,8 @@ const App = ({data, viewport}) => {
     pickable: true,
     elevationScale: 5000,
     getPosition: d => d.centroid,
-    getColor: d => [48, 128, d.value * 255, 255],
+    getFillColor: d => [48, 128, d.value * 255, 255],
+    getLineColor: [0, 0, 0],
     getElevation: d => d.value,
     onHover: ({object, x, y}) => {
       const tooltip = `height: ${object.value * 5000}m`;
@@ -67,10 +67,10 @@ new ColumnLayer({});
 To use pre-bundled scripts:
 
 ```html
-<script src="https://unpkg.com/@deck.gl@~7.0.0/dist.min.js"></script>
+<script src="https://unpkg.com/deck.gl@^8.0.0/dist.min.js"></script>
 <!-- or -->
-<script src="https://unpkg.com/@deck.gl/core@~7.0.0/dist.min.js"></script>
-<script src="https://unpkg.com/@deck.gl/layers@~7.0.0/dist.min.js"></script>
+<script src="https://unpkg.com/@deck.gl/core@^8.0.0/dist.min.js"></script>
+<script src="https://unpkg.com/@deck.gl/layers@^8.0.0/dist.min.js"></script>
 ```
 
 ```js
@@ -90,13 +90,13 @@ Inherits from all [Base Layer](/docs/api-reference/layer.md) properties.
 
 The number of sides to render the disk as. The disk is a regular polygon that fits inside the given radius. A higher resolution will yield a smoother look close-up, but also need more resources to render.
 
-##### `radius` (Number, optional)
+##### `radius` (Number, optional) ![transition-enabled](https://img.shields.io/badge/transition-enabled-green.svg?style=flat-square")
 
 * Default: `1000`
 
 Disk radius in meters.
 
-##### `angle` (Number, optional)
+##### `angle` (Number, optional) ![transition-enabled](https://img.shields.io/badge/transition-enabled-green.svg?style=flat-square")
 
 * Default: `0`
 
@@ -106,20 +106,20 @@ Disk rotation, counter-clockwise in degrees.
 
 Replace the default geometry (regular polygon that fits inside the unit circle) with a custom one. The length of the array must be at least `diskResolution`. Each vertex is a point `[x, y]` that is the offset from the instance position, relative to the radius.
 
-##### `offset` ([Number, Number], optional)
+##### `offset` ([Number, Number], optional) ![transition-enabled](https://img.shields.io/badge/transition-enabled-green.svg?style=flat-square")
 
 * Default: `[0, 0]`
 
 Disk offset from the position, relative to the radius. By default, the disk is centered at each position.
 
-##### `coverage` (Number, optional)
+##### `coverage` (Number, optional) ![transition-enabled](https://img.shields.io/badge/transition-enabled-green.svg?style=flat-square")
 
 * Default: `1`
 
 Radius multiplier, between 0 - 1. The radius of the disk is calculated by
 `coverage * radius`
 
-##### `elevationScale` (Number, optional)
+##### `elevationScale` (Number, optional) ![transition-enabled](https://img.shields.io/badge/transition-enabled-green.svg?style=flat-square")
 
 * Default: `1`
 
@@ -153,31 +153,25 @@ Whether to generate a line wireframe of the column. The outline will have
 "horizontal" lines closing the top and bottom polygons and a vertical line
 (a "strut") for each vertex around the disk. Only applies if `extruded: true`.
 
-##### `fp64` (Boolean, optional)
-
-* Default: `false`
-
-Whether the layer should be rendered in high-precision 64-bit mode. Note that since deck.gl v6.1, the default 32-bit projection uses a hybrid mode that matches 64-bit precision with significantly better performance.
-
 ##### `lineWidthUnits` (String, optional)
 
 * Default: `'meters'`
 
 The units of the outline width, one of `'meters'`, `'pixels'`. When zooming in and out, meter sizes scale with the base map, and pixel sizes remain the same on screen.
 
-##### `lineWidthScale` (Boolean, optional)
+##### `lineWidthScale` (Boolean, optional) ![transition-enabled](https://img.shields.io/badge/transition-enabled-green.svg?style=flat-square")
 
 * Default: `1`
 
 The line width multiplier that multiplied to all outlines if the `stroked` attribute is `true`.
 
-##### `lineWidthMinPixels` (Number, optional)
+##### `lineWidthMinPixels` (Number, optional) ![transition-enabled](https://img.shields.io/badge/transition-enabled-green.svg?style=flat-square")
 
 * Default: `0`
 
 The minimum outline width in pixels.
 
-##### `lineWidthMaxPixels` (Number, optional)
+##### `lineWidthMaxPixels` (Number, optional) ![transition-enabled](https://img.shields.io/badge/transition-enabled-green.svg?style=flat-square")
 
 * Default: Number.MAX_SAFE_INTEGER
 
@@ -186,10 +180,10 @@ The maximum outline width in pixels.
 
 ##### `material` (Object, optional)
 
-* Default: `new PhongMaterial()`
+* Default: `true`
 
-This is an object that contains material props for [lighting effect](/docs/effects/lighting-effect.md) applied on extruded polygons.
-Check [PhongMaterial](https://github.com/uber/luma.gl/tree/7.0-release/docs/api-reference/core/materials/phong-material.md) for more details.
+This is an object that contains material props for [lighting effect](/docs/effects/lighting-effect.md) applied on extruded polygons. Check [the lighting guide](/docs/developer-guide/using-lighting.md#constructing-a-material-instance) for configurable settings.
+
 
 ### Data Accessors
 
@@ -203,7 +197,7 @@ Method called to retrieve the position of each column, in `[x, y]`. An optional 
 
 * Default: `[0, 0, 0, 255]`
 
-The rgba color of each object, in `r, g, b, [a]`. Each component is in the 0-255 range.
+The rgba color is in the format of `[r, g, b, [a]]`. Each channel is a number between 0-255 and `a` is 255 if not supplied.
 
 * If an array is provided, it is used as the color for all objects.
 * If a function is provided, it is called on each object to retrieve its color.
@@ -213,7 +207,7 @@ The rgba color of each object, in `r, g, b, [a]`. Each component is in the 0-255
 
 * Default: `[0, 0, 0, 255]`
 
-The rgba outline color of each object, in `r, g, b, [a]`. Each component is in the 0-255 range.
+The rgba color is in the format of `[r, g, b, [a]]`. Each channel is a number between 0-255 and `a` is 255 if not supplied.
 
 * If an array is provided, it is used as the outline color for all columns.
 * If a function is provided, it is called on each object to retrieve its outline color.
@@ -241,4 +235,3 @@ The width of the outline of the column, in units specified by `lineWidthUnits` (
 ## Source
 
 [modules/layers/src/column-layer](https://github.com/uber/deck.gl/tree/master/modules/layers/src/column-layer)
-

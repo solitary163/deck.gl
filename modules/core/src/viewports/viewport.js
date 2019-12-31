@@ -19,7 +19,7 @@
 // THE SOFTWARE.
 
 import log from '../utils/log';
-import {createMat4, extractCameraVectors} from '../utils/math-utils';
+import {createMat4, extractCameraVectors, getFrustumPlanes} from '../utils/math-utils';
 
 import {Matrix4, Vector3, equals} from 'math.gl';
 import * as mat4 from 'gl-matrix/mat4';
@@ -31,9 +31,9 @@ import {
   worldToLngLat,
   worldToPixels,
   pixelsToWorld
-} from 'viewport-mercator-project';
+} from '@math.gl/web-mercator';
 
-import assert from '../utils/assert';
+import {PROJECTION_MODE} from '../lib/constants';
 
 const DEGREES_TO_RADIANS = Math.PI / 180;
 
@@ -43,7 +43,10 @@ const ZERO_VECTOR = [0, 0, 0];
 
 const DEFAULT_ZOOM = 0;
 
-const ERR_ARGUMENT = 'Illegal argument to Viewport';
+const DEFAULT_DISTANCE_SCALES = {
+  unitsPerMeter: [1, 1, 1],
+  metersPerUnit: [1, 1, 1]
+};
 
 export default class Viewport {
   /**
@@ -70,6 +73,7 @@ export default class Viewport {
     // Silently allow apps to send in w,h = 0,0
     this.width = width || 1;
     this.height = height || 1;
+    this._frustumPlanes = {};
 
     this._initViewMatrix(opts);
     this._initProjectionMatrix(opts);
@@ -83,7 +87,19 @@ export default class Viewport {
     this.unprojectPosition = this.unprojectPosition.bind(this);
     this.projectFlat = this.projectFlat.bind(this);
     this.unprojectFlat = this.unprojectFlat.bind(this);
-    this.getMatrices = this.getMatrices.bind(this);
+  }
+
+  get metersPerPixel() {
+    return this.distanceScales.metersPerUnit[2] / this.scale;
+  }
+
+  get projectionMode() {
+    if (this.isGeospatial) {
+      return this.zoom < 12
+        ? PROJECTION_MODE.WEB_MERCATOR
+        : PROJECTION_MODE.WEB_MERCATOR_AUTO_OFFSET;
+    }
+    return PROJECTION_MODE.IDENTITY;
   }
 
   // Two viewports are equal if width and height are identical, and if
@@ -138,7 +154,7 @@ export default class Viewport {
     const [x, y, z] = xyz;
 
     const y2 = topLeft ? y : this.height - y;
-    const targetZWorld = targetZ && targetZ * this.distanceScales.pixelsPerMeter[2];
+    const targetZWorld = targetZ && targetZ * this.distanceScales.unitsPerMeter[2];
     const coord = pixelsToWorld([x, y2, z], this.pixelUnprojectionMatrix, targetZWorld);
     const [X, Y, Z] = this.unprojectPosition(coord);
 
@@ -153,13 +169,13 @@ export default class Viewport {
 
   projectPosition(xyz) {
     const [X, Y] = this.projectFlat(xyz);
-    const Z = (xyz[2] || 0) * this.distanceScales.pixelsPerMeter[2];
+    const Z = (xyz[2] || 0) * this.distanceScales.unitsPerMeter[2];
     return [X, Y, Z];
   }
 
   unprojectPosition(xyz) {
     const [X, Y] = this.unprojectFlat(xyz);
-    const Z = (xyz[2] || 0) * this.distanceScales.metersPerPixel[2];
+    const Z = (xyz[2] || 0) * this.distanceScales.metersPerUnit[2];
     return [X, Y, Z];
   }
 
@@ -172,12 +188,11 @@ export default class Viewport {
    *   Specifies a point on the sphere to project onto the map.
    * @return {Array} [x,y] coordinates.
    */
-  projectFlat(xyz, scale = this.scale) {
+  projectFlat(xyz) {
     if (this.isGeospatial) {
-      return lngLatToWorld(xyz, scale);
+      return lngLatToWorld(xyz);
     }
-    const {pixelsPerMeter} = this.distanceScales;
-    return [xyz[0] * pixelsPerMeter[0], xyz[1] * pixelsPerMeter[1]];
+    return xyz;
   }
 
   /**
@@ -188,12 +203,11 @@ export default class Viewport {
    *   Has toArray method if you need a GeoJSON Array.
    *   Per cartographic tradition, lat and lon are specified as degrees.
    */
-  unprojectFlat(xyz, scale = this.scale) {
+  unprojectFlat(xyz) {
     if (this.isGeospatial) {
-      return worldToLngLat(xyz, scale);
+      return worldToLngLat(xyz);
     }
-    const {metersPerPixel} = this.distanceScales;
-    return [xyz[0] * metersPerPixel[0], xyz[1] * metersPerPixel[1]];
+    return xyz;
   }
 
   getDistanceScales(coordinateOrigin = null) {
@@ -201,40 +215,10 @@ export default class Viewport {
       return getDistanceScales({
         longitude: coordinateOrigin[0],
         latitude: coordinateOrigin[1],
-        scale: this.scale,
         highPrecision: true
       });
     }
     return this.distanceScales;
-  }
-
-  getMatrices({modelMatrix = null} = {}) {
-    let modelViewProjectionMatrix = this.viewProjectionMatrix;
-    let pixelProjectionMatrix = this.pixelProjectionMatrix;
-    let pixelUnprojectionMatrix = this.pixelUnprojectionMatrix;
-
-    if (modelMatrix) {
-      modelViewProjectionMatrix = mat4.multiply([], this.viewProjectionMatrix, modelMatrix);
-      pixelProjectionMatrix = mat4.multiply([], this.pixelProjectionMatrix, modelMatrix);
-      pixelUnprojectionMatrix = mat4.invert([], pixelProjectionMatrix);
-    }
-
-    const matrices = Object.assign({
-      modelViewProjectionMatrix,
-      viewProjectionMatrix: this.viewProjectionMatrix,
-      viewMatrix: this.viewMatrix,
-      projectionMatrix: this.projectionMatrix,
-
-      // project/unproject between pixels and world
-      pixelProjectionMatrix,
-      pixelUnprojectionMatrix,
-
-      width: this.width,
-      height: this.height,
-      scale: this.scale
-    });
-
-    return matrices;
   }
 
   containsPixel({x, y, width = 1, height = 1}) {
@@ -244,6 +228,31 @@ export default class Viewport {
       y < this.y + this.height &&
       this.y < y + height
     );
+  }
+
+  // Extract frustum planes in common space
+  getFrustumPlanes() {
+    if (this._frustumPlanes.near) {
+      return this._frustumPlanes;
+    }
+
+    const {near, far, fovyRadians, aspect} = this.projectionProps;
+
+    Object.assign(
+      this._frustumPlanes,
+      getFrustumPlanes({
+        aspect,
+        near,
+        far,
+        fovyRadians,
+        position: this.cameraPosition,
+        direction: this.cameraDirection,
+        up: this.cameraUp,
+        right: this.cameraRight
+      })
+    );
+
+    return this._frustumPlanes;
   }
 
   // EXPERIMENTAL METHODS
@@ -262,26 +271,7 @@ export default class Viewport {
 
   // INTERNAL METHODS
 
-  // TODO - these are duplicating WebMercator methods
-  _addMetersToLngLat(lngLatZ, xyz) {
-    const [lng, lat, Z = 0] = lngLatZ;
-    const [deltaLng, deltaLat, deltaZ = 0] = this._metersToLngLatDelta(xyz);
-    return lngLatZ.length === 2
-      ? [lng + deltaLng, lat + deltaLat]
-      : [lng + deltaLng, lat + deltaLat, Z + deltaZ];
-  }
-
-  _metersToLngLatDelta(xyz) {
-    const [x, y, z = 0] = xyz;
-    assert(Number.isFinite(x) && Number.isFinite(y) && Number.isFinite(z), ERR_ARGUMENT);
-    const {pixelsPerMeter, degreesPerPixel} = this.distanceScales;
-    const deltaLng = x * pixelsPerMeter[0] * degreesPerPixel[0];
-    const deltaLat = y * pixelsPerMeter[1] * degreesPerPixel[1];
-    return xyz.length === 2 ? [deltaLng, deltaLat] : [deltaLng, deltaLat, z];
-  }
-
   _createProjectionMatrix({orthographic, fovyRadians, aspect, focalDistance, near, far}) {
-    assert(Number.isFinite(fovyRadians));
     return orthographic
       ? new Matrix4().orthographic({fovy: fovyRadians, aspect, focalDistance, near, far})
       : new Matrix4().perspective({fovy: fovyRadians, aspect, near, far});
@@ -318,16 +308,13 @@ export default class Viewport {
 
     // Calculate distance scales if lng/lat/zoom are provided
     this.distanceScales = this.isGeospatial
-      ? getDistanceScales({latitude, longitude, scale: this.scale})
-      : distanceScales || {
-          pixelsPerMeter: [scale, scale, scale],
-          metersPerPixel: [1 / scale, 1 / scale, 1 / scale]
-        };
+      ? getDistanceScales({latitude, longitude})
+      : distanceScales || DEFAULT_DISTANCE_SCALES;
 
     this.focalDistance = focalDistance;
 
-    this.distanceScales.metersPerPixel = new Vector3(this.distanceScales.metersPerPixel);
-    this.distanceScales.pixelsPerMeter = new Vector3(this.distanceScales.pixelsPerMeter);
+    this.distanceScales.metersPerUnit = new Vector3(this.distanceScales.metersPerUnit);
+    this.distanceScales.unitsPerMeter = new Vector3(this.distanceScales.unitsPerMeter);
 
     this.position = ZERO_VECTOR;
     this.meterOffset = ZERO_VECTOR;
@@ -343,13 +330,10 @@ export default class Viewport {
       this.longitude = longitude;
       this.latitude = latitude;
       this.center = this._getCenterInWorld({longitude, latitude});
-
-      // Flip Y to match the orientation of the Mercator plane
-      this.viewMatrixUncentered = mat4.scale([], viewMatrix, [1, -1, 1]);
     } else {
       this.center = position ? this.projectPosition(position) : [0, 0, 0];
-      this.viewMatrixUncentered = viewMatrix;
     }
+    this.viewMatrixUncentered = viewMatrix;
     // Make a centered version of the matrix for projection modes without an offset
     this.viewMatrix = new Matrix4()
       // Apply the uncentered view matrix
@@ -360,17 +344,17 @@ export default class Viewport {
   /* eslint-enable complexity, max-statements */
 
   _getCenterInWorld({longitude, latitude}) {
-    const {meterOffset, scale, distanceScales} = this;
+    const {meterOffset, distanceScales} = this;
 
     // Make a centered version of the matrix for projection modes without an offset
-    const center2d = this.projectFlat([longitude, latitude], scale);
+    const center2d = this.projectFlat([longitude, latitude]);
     const center = new Vector3(center2d[0], center2d[1], 0);
 
     if (meterOffset) {
-      const pixelPosition = new Vector3(meterOffset)
+      const commonPosition = new Vector3(meterOffset)
         // Convert to pixels in current zoom
-        .scale(distanceScales.pixelsPerMeter);
-      center.add(pixelPosition);
+        .scale(distanceScales.unitsPerMeter);
+      center.add(commonPosition);
     }
 
     return center;
@@ -384,26 +368,22 @@ export default class Viewport {
       // Projection matrix parameters, used if projectionMatrix not supplied
       orthographic = false,
       fovyRadians,
-      fovyDegrees,
-      fovy,
+      fovy = 75,
       near = 0.1, // Distance of near clipping plane
       far = 1000, // Distance of far clipping plane
-      focalDistance = 1, // Only needed for orthographic views
-      orthographicFocalDistance
+      focalDistance = 1
     } = opts;
 
-    const radians = fovyRadians || (fovyDegrees || fovy || 75) * DEGREES_TO_RADIANS;
+    this.projectionProps = {
+      orthographic,
+      fovyRadians: fovyRadians || fovy * DEGREES_TO_RADIANS,
+      aspect: this.width / this.height,
+      focalDistance,
+      near,
+      far
+    };
 
-    this.projectionMatrix =
-      projectionMatrix ||
-      this._createProjectionMatrix({
-        orthographic,
-        fovyRadians: radians,
-        aspect: this.width / this.height,
-        focalDistance: orthographicFocalDistance || focalDistance,
-        near,
-        far
-      });
+    this.projectionMatrix = projectionMatrix || this._createProjectionMatrix(this.projectionProps);
   }
 
   _initPixelMatrices() {
@@ -420,13 +400,14 @@ export default class Viewport {
     this.viewMatrixInverse = mat4.invert([], this.viewMatrix) || this.viewMatrix;
 
     // Decompose camera directions
-    const {eye, direction, up} = extractCameraVectors({
+    const {eye, direction, up, right} = extractCameraVectors({
       viewMatrix: this.viewMatrix,
       viewMatrixInverse: this.viewMatrixInverse
     });
     this.cameraPosition = eye;
     this.cameraDirection = direction;
     this.cameraUp = up;
+    this.cameraRight = right;
 
     // console.log(this.cameraPosition, this.cameraDirection, this.cameraUp);
 

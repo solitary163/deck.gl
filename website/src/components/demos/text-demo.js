@@ -1,11 +1,7 @@
 import React, {Component} from 'react';
 import {MAPBOX_STYLES, DATA_URI} from '../../constants/defaults';
 import {readableInteger} from '../../utils/format-utils';
-import {App, INITIAL_VIEW_STATE} from 'website-examples/tagmap/app';
-
-function stopPropagation(evt) {
-  evt.stopPropagation();
-}
+import App from 'website-examples/tagmap/app';
 
 export default class TextDemo extends Component {
 
@@ -21,13 +17,6 @@ export default class TextDemo extends Component {
       cluster: {displayName: 'Dynamic Cluster', type: 'checkbox', value: true},
       fontSize: {displayName: 'Font Size',
         type: 'range', value: 32, step: 1, min: 20, max: 80}
-    };
-  }
-
-  static get viewport() {
-    return {
-      ...INITIAL_VIEW_STATE,
-      dragToRotate: false
     };
   }
 

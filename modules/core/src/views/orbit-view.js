@@ -13,8 +13,10 @@ function getViewMatrix({height, fovy, orbitAxis, rotationX, rotationOrbit, zoom}
   // By doing so we are able to convert between common space and screen space sizes efficiently
   // in the vertex shader.
   const distance = 0.5 / Math.tan((fovy * DEGREES_TO_RADIANS) / 2);
+  const up = orbitAxis === 'Z' ? [0, 0, 1] : [0, 1, 0];
+  const eye = orbitAxis === 'Z' ? [0, -distance, 0] : [0, 0, distance];
 
-  const viewMatrix = new Matrix4().lookAt({eye: [0, 0, distance]});
+  const viewMatrix = new Matrix4().lookAt({eye, up});
 
   viewMatrix.rotateX(rotationX * DEGREES_TO_RADIANS);
   if (orbitAxis === 'Z') {
@@ -28,8 +30,8 @@ function getViewMatrix({height, fovy, orbitAxis, rotationX, rotationOrbit, zoom}
   // moving them further away between the near/far plane.
   // Without modifying the default near/far planes, we instead scale down the common space to
   // remove the distortion to the depth field.
-  const projectionScale = 1 / (height || 1);
-  viewMatrix.scale([projectionScale, projectionScale, projectionScale]);
+  const projectionScale = Math.pow(2, zoom) / (height || 1);
+  viewMatrix.scale(projectionScale);
 
   return viewMatrix;
 }

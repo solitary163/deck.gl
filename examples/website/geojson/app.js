@@ -1,7 +1,9 @@
 import React, {Component} from 'react';
 import {render} from 'react-dom';
 import {StaticMap} from 'react-map-gl';
-import DeckGL, {GeoJsonLayer} from 'deck.gl';
+import DeckGL from '@deck.gl/react';
+import {GeoJsonLayer, PolygonLayer} from '@deck.gl/layers';
+import {LightingEffect, AmbientLight, _SunLight as SunLight} from '@deck.gl/core';
 import {scaleThreshold} from 'd3-scale';
 
 // Set your mapbox token here
@@ -30,7 +32,7 @@ export const COLOR_SCALE = scaleThreshold()
     [128, 0, 38]
   ]);
 
-export const INITIAL_VIEW_STATE = {
+const INITIAL_VIEW_STATE = {
   latitude: 49.254,
   longitude: -123.13,
   zoom: 11,
@@ -39,7 +41,21 @@ export const INITIAL_VIEW_STATE = {
   bearing: 0
 };
 
-export class App extends Component {
+const ambientLight = new AmbientLight({
+  color: [255, 255, 255],
+  intensity: 1.0
+});
+
+const dirLight = new SunLight({
+  timestamp: Date.UTC(2019, 7, 1, 22),
+  color: [255, 255, 255],
+  intensity: 1.0,
+  _shadow: true
+});
+
+const landCover = [[[-123.0, 49.196], [-123.0, 49.324], [-123.306, 49.324], [-123.306, 49.196]]];
+
+export default class App extends Component {
   constructor(props) {
     super(props);
 
@@ -48,6 +64,10 @@ export class App extends Component {
     };
     this._onHover = this._onHover.bind(this);
     this._renderTooltip = this._renderTooltip.bind(this);
+
+    const lightingEffect = new LightingEffect({ambientLight, dirLight});
+    lightingEffect.shadowColor = [0, 0, 0, 0.5];
+    this._effects = [lightingEffect];
   }
 
   _onHover({x, y, object}) {
@@ -58,6 +78,14 @@ export class App extends Component {
     const {data = DATA_URL} = this.props;
 
     return [
+      // only needed when using shadows - a plane for shadows to drop on
+      new PolygonLayer({
+        id: 'ground',
+        data: landCover,
+        stroked: false,
+        getPolygon: f => f,
+        getFillColor: [0, 0, 0, 0]
+      }),
       new GeoJsonLayer({
         id: 'geojson',
         data,
@@ -66,7 +94,6 @@ export class App extends Component {
         filled: true,
         extruded: true,
         wireframe: true,
-        fp64: true,
         getElevation: f => Math.sqrt(f.properties.valuePerSqm) * 10,
         getFillColor: f => COLOR_SCALE(f.properties.growth),
         getLineColor: [255, 255, 255],
@@ -100,23 +127,21 @@ export class App extends Component {
   }
 
   render() {
-    const {viewState, controller = true, baseMap = true} = this.props;
+    const {mapStyle = 'mapbox://styles/mapbox/light-v9'} = this.props;
 
     return (
       <DeckGL
         layers={this._renderLayers()}
+        effects={this._effects}
         initialViewState={INITIAL_VIEW_STATE}
-        viewState={viewState}
-        controller={controller}
+        controller={true}
       >
-        {baseMap && (
-          <StaticMap
-            reuseMaps
-            mapStyle="mapbox://styles/mapbox/light-v9"
-            preventStyleDiffing={true}
-            mapboxApiAccessToken={MAPBOX_TOKEN}
-          />
-        )}
+        <StaticMap
+          reuseMaps
+          mapStyle={mapStyle}
+          preventStyleDiffing={true}
+          mapboxApiAccessToken={MAPBOX_TOKEN}
+        />
 
         {this._renderTooltip}
       </DeckGL>

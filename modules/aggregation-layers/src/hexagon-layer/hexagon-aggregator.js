@@ -19,7 +19,7 @@
 // THE SOFTWARE.
 
 import {hexbin} from 'd3-hexbin';
-import {createIterable} from '@deck.gl/core';
+import {createIterable, log} from '@deck.gl/core';
 
 /**
  * Use d3-hexbin to performs hexagonal binning from geo points to hexagons
@@ -30,27 +30,38 @@ import {createIterable} from '@deck.gl/core';
 
  * @return {Object} - hexagons and countRange
  */
-export function pointToHexbin({data, radius, getPosition}, viewport) {
+export function pointToHexbin(props, aggregationParams) {
+  const {data, radius} = props;
+  const {viewport, attributes} = aggregationParams;
   // get hexagon radius in mercator world unit
-  const radiusInPixel = getRadiusInPixel(radius, viewport);
+  const radiusCommon = getRadiusInCommon(radius, viewport);
 
   // add world space coordinates to points
   const screenPoints = [];
   const {iterable, objectInfo} = createIterable(data);
+  const positions = attributes.positions.value;
+  const {size} = attributes.positions.getAccessor();
   for (const object of iterable) {
     objectInfo.index++;
-    screenPoints.push(
-      Object.assign(
-        {
-          screenCoord: viewport.projectFlat(getPosition(object, objectInfo))
-        },
-        object
-      )
-    );
+    const posIndex = objectInfo.index * size;
+    const position = [positions[posIndex], positions[posIndex + 1]];
+    const arrayIsFinite = Number.isFinite(position[0]) && Number.isFinite(position[1]);
+    if (arrayIsFinite) {
+      screenPoints.push(
+        Object.assign(
+          {
+            screenCoord: viewport.projectFlat(position)
+          },
+          object
+        )
+      );
+    } else {
+      log.warn('HexagonLayer: invalid position')();
+    }
   }
 
   const newHexbin = hexbin()
-    .radius(radiusInPixel)
+    .radius(radiusCommon)
     .x(d => d.screenCoord[0])
     .y(d => d.screenCoord[1]);
 
@@ -72,9 +83,9 @@ export function pointToHexbin({data, radius, getPosition}, viewport) {
 
  * @return {Number} radius in mercator world spcae coordinates
  */
-export function getRadiusInPixel(radius, viewport) {
-  const {pixelsPerMeter} = viewport.getDistanceScales();
+export function getRadiusInCommon(radius, viewport) {
+  const {unitsPerMeter} = viewport.getDistanceScales();
 
   // x, y distance should be the same
-  return radius * pixelsPerMeter[0];
+  return radius * unitsPerMeter[0];
 }

@@ -2,7 +2,6 @@
 
 <p class="badges">
   <img src="https://img.shields.io/badge/@deck.gl/layers-lightgrey.svg?style=flat-square" alt="@deck.gl/layers" />
-  <img src="https://img.shields.io/badge/fp64-yes-blue.svg?style=flat-square" alt="64-bit" />
   <img src="https://img.shields.io/badge/lighting-yes-blue.svg?style=flat-square" alt="lighting" />
 </p>
 
@@ -69,10 +68,10 @@ new GeoJsonLayer({});
 To use pre-bundled scripts:
 
 ```html
-<script src="https://unpkg.com/@deck.gl@~7.0.0/dist.min.js"></script>
+<script src="https://unpkg.com/deck.gl@^8.0.0/dist.min.js"></script>
 <!-- or -->
-<script src="https://unpkg.com/@deck.gl/core@~7.0.0/dist.min.js"></script>
-<script src="https://unpkg.com/@deck.gl/layers@~7.0.0/dist.min.js"></script>
+<script src="https://unpkg.com/@deck.gl/core@^8.0.0/dist.min.js"></script>
+<script src="https://unpkg.com/@deck.gl/layers@^8.0.0/dist.min.js"></script>
 ```
 
 ```js
@@ -141,7 +140,7 @@ Remarks:
 
 The units of the line width, one of `'meters'`, `'pixels'`. When zooming in and out, meter sizes scale with the base map, and pixel sizes remain the same on screen.
 
-##### `lineWidthScale` (Number, optional)
+##### `lineWidthScale` (Number, optional) ![transition-enabled](https://img.shields.io/badge/transition-enabled-green.svg?style=flat-square")
 
 * Default: `1`
 
@@ -149,13 +148,13 @@ The line width multiplier that multiplied to all lines, including the `LineStrin
 and `MultiLineString` features and also the outline for `Polygon` and `MultiPolygon`
 features if the `stroked` attribute is true.
 
-##### `lineWidthMinPixels` (Number, optional)
+##### `lineWidthMinPixels` (Number, optional) ![transition-enabled](https://img.shields.io/badge/transition-enabled-green.svg?style=flat-square")
 
 * Default: `0`
 
 The minimum line width in pixels.
 
-##### `lineWidthMaxPixels` (Number, optional)
+##### `lineWidthMaxPixels` (Number, optional) ![transition-enabled](https://img.shields.io/badge/transition-enabled-green.svg?style=flat-square")
 
 * Default: Number.MAX_SAFE_INTEGER
 
@@ -167,14 +166,14 @@ The maximum line width in pixels.
 
 Type of joint. If `true`, draw round joints. Otherwise draw miter joints.
 
-##### `lineMiterLimit` (Number, optional)
+##### `lineMiterLimit` (Number, optional) ![transition-enabled](https://img.shields.io/badge/transition-enabled-green.svg?style=flat-square")
 
 * Default: `4`
 
 The maximum extent of a joint in ratio to the stroke width.
 Only works if `lineJointRounded` is `false`.
 
-##### `elevationScale` (Number, optional)
+##### `elevationScale` (Number, optional) ![transition-enabled](https://img.shields.io/badge/transition-enabled-green.svg?style=flat-square")
 
 * Default: `1`
 
@@ -182,43 +181,30 @@ Elevation multiplier. The final elevation is calculated by
   `elevationScale * getElevation(d)`. `elevationScale` is a handy property to scale
 all polygon elevation without updating the data.
 
-##### `pointRadiusScale` (Number, optional)
+##### `pointRadiusScale` (Number, optional) ![transition-enabled](https://img.shields.io/badge/transition-enabled-green.svg?style=flat-square")
 
 * Default: `1`
 
 A global radius multiplier for all points.
 
-##### `pointRadiusMinPixels` (Number, optional)
+##### `pointRadiusMinPixels` (Number, optional) ![transition-enabled](https://img.shields.io/badge/transition-enabled-green.svg?style=flat-square")
 
 * Default: `0`
 
 The minimum radius in pixels.
 
-##### `pointRadiusMaxPixels` (Number, optional)
+##### `pointRadiusMaxPixels` (Number, optional) ![transition-enabled](https://img.shields.io/badge/transition-enabled-green.svg?style=flat-square")
 
 * Default: `Number.MAX_SAFE_INTEGER`
 
 The maximum radius in pixels.
 
-##### `lineDashJustified` (Boolean, optional)
-
-* Default: `false`
-
-Justify dashes together.
-Only works if `getLineDashArray` is specified.
-
-##### `fp64` (Boolean, optional)
-
-* Default: `false`
-
-Whether the layer should be rendered in high-precision 64-bit mode. Note that since deck.gl v6.1, the default 32-bit projection uses a hybrid mode that matches 64-bit precision with significantly better performance.
-
 ##### `material` (Object, optional)
 
-* Default: `new PhongMaterial()`
+* Default: `true`
 
 This is an object that contains material props for [lighting effect](/docs/effects/lighting-effect.md) applied on extruded polygons.
-Check [PhongMaterial](https://github.com/uber/luma.gl/tree/7.0-release/docs/api-reference/core/materials/phong-material.md) for more details.
+Check [the lighting guide](/docs/developer-guide/using-lighting.md#constructing-a-material-instance) for configurable settings.
 
 ### Data Accessors
 
@@ -226,8 +212,7 @@ Check [PhongMaterial](https://github.com/uber/luma.gl/tree/7.0-release/docs/api-
 
 * Default: `[0, 0, 0, 255]`
 
-The rgba color of line string and/or the outline of polygon for a GeoJson feature, depending on its type.
-Format is `r, g, b, [a]`. Each component is in the 0-255 range.
+The rgba color is in the format of `[r, g, b, [a]]`. Each channel is a number between 0-255 and `a` is 255 if not supplied.
 
 * If an array is provided, it is used as the line color for all features.
 * If a function is provided, it is called on each feature to retrieve its line color.
@@ -237,7 +222,8 @@ Format is `r, g, b, [a]`. Each component is in the 0-255 range.
 * Default: `[0, 0, 0, 255]`
 
 The solid color of the polygon and point features of a GeoJson.
-Format is `r, g, b, [a]`. Each component is in the 0-255 range.
+Format is `[r, g, b, [a]]`. Each channel is a number between 0-255 and `a` is 255 if not supplied.
+
 
 * If an array is provided, it is used as the fill color for all features.
 * If a function is provided, it is called on each feature to retrieve its fill color.
@@ -280,15 +266,6 @@ otherwise will be in unit coordinates.
 
 Note: This accessor is only called for `Polygon` and `MultiPolygon` features.
 
-##### `getLineDashArray` ([Function](/docs/developer-guide/using-layers.md#accessors)|Array, optional)
-
-* Default: `null`
-
-The dash array to draw each outline path with: `[dashSize, gapSize]` relative to the width of the line. (See PathLayer)
-
-* If an array is provided, it is used as the dash array for all paths.
-* If a function is provided, it is called on each path to retrieve its dash array. Return `[0, 0]` to draw the path in solid line.
-* If this accessor is not specified, all paths are drawn as solid lines.
 
 ## Sub Layers
 
@@ -313,4 +290,3 @@ The GeoJsonLayer renders the following sublayers:
 ## Source
 
 [modules/layers/src/geojson-layer](https://github.com/uber/deck.gl/tree/master/modules/layers/src/geojson-layer)
-

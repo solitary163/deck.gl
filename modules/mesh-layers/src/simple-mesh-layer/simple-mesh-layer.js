@@ -22,46 +22,17 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
-import {Layer, createIterable} from '@deck.gl/core';
+import {Layer, project32, phongLighting, picking, COORDINATE_SYSTEM, log} from '@deck.gl/core';
 import GL from '@luma.gl/constants';
-import {Model, Geometry, Texture2D, fp64, PhongMaterial, isWebGL2} from '@luma.gl/core';
-import {load} from '@loaders.gl/core';
-import {loadImage} from '@loaders.gl/images';
-const {fp64LowPart} = fp64;
+import {Model, Geometry, Texture2D, isWebGL2} from '@luma.gl/core';
 
-import {MATRIX_ATTRIBUTES} from '../utils/matrix';
+import {MATRIX_ATTRIBUTES, shouldComposeModelMatrix} from '../utils/matrix';
 
 // NOTE(Tarek): Should eventually phase out the glsl1 versions.
 import vs1 from './simple-mesh-layer-vertex.glsl1';
 import fs1 from './simple-mesh-layer-fragment.glsl1';
 import vs3 from './simple-mesh-layer-vertex.glsl';
 import fs3 from './simple-mesh-layer-fragment.glsl';
-
-// Replacement for the external assert method to reduce bundle size
-function assert(condition, message) {
-  if (!condition) {
-    throw new Error(`deck.gl: ${message}`);
-  }
-}
-
-/*
- * Load image data into luma.gl Texture2D objects
- * @param {WebGLContext} gl
- * @param {String|Texture2D|HTMLImageElement|Uint8ClampedArray} src - source of image data
- *   can be url string, Texture2D object, HTMLImageElement or pixel array
- * @returns {Promise} resolves to an object with name -> texture mapping
- */
-function getTexture(gl, src, opts) {
-  if (typeof src === 'string') {
-    // Url, load the image
-    return loadImage(src)
-      .then(data => getTextureFromData(gl, data, opts))
-      .catch(error => {
-        throw new Error(`Could not load texture from ${src}: ${error}`);
-      });
-  }
-  return new Promise(resolve => resolve(getTextureFromData(gl, src, opts)));
-}
 
 /*
  * Convert image data into texture
@@ -75,7 +46,7 @@ function getTextureFromData(gl, data, opts) {
 }
 
 function validateGeometryAttributes(attributes) {
-  assert(
+  log.assert(
     attributes.positions || attributes.POSITION,
     'SimpleMeshLayer requires "postions" or "POSITION" attribute in mesh property.'
   );
@@ -103,31 +74,23 @@ function getGeometry(data) {
 }
 
 const DEFAULT_COLOR = [0, 0, 0, 255];
-const defaultMaterial = new PhongMaterial();
 
 const defaultProps = {
-  fetch: (url, {propName}) => {
-    if (propName === 'mesh') {
-      return load(url);
-    }
-
-    return fetch(url).then(response => response.json());
-  },
   mesh: {value: null, type: 'object', async: true},
-  texture: null,
+  texture: {type: 'object', value: null, async: true},
   sizeScale: {type: 'number', value: 1, min: 0},
   // TODO - parameters should be merged, not completely overridden
   parameters: {
     depthTest: true,
     depthFunc: GL.LEQUAL
   },
-  fp64: false,
+
   // NOTE(Tarek): Quick and dirty wireframe. Just draws
   // the same mesh with LINE_STRIPS. Won't follow edges
   // of the original mesh.
   wireframe: false,
   // Optional material for 'lighting' shader module
-  material: defaultMaterial,
+  material: true,
   getPosition: {type: 'accessor', value: x => x.position},
   getColor: {type: 'accessor', value: DEFAULT_COLOR},
 
@@ -143,12 +106,11 @@ const defaultProps = {
 
 export default class SimpleMeshLayer extends Layer {
   getShaders() {
-    const projectModule = this.use64bitProjection() ? 'project64' : 'project32';
     const gl2 = isWebGL2(this.context.gl);
     const vs = gl2 ? vs3 : vs1;
     const fs = gl2 ? fs3 : fs1;
 
-    return {vs, fs, modules: [projectModule, 'phong-lighting', 'picking']};
+    return super.getShaders({vs, fs, modules: [project32, phongLighting, picking]});
   }
 
   initializeState() {
@@ -157,17 +119,16 @@ export default class SimpleMeshLayer extends Layer {
     attributeManager.addInstanced({
       instancePositions: {
         transition: true,
+        type: GL.DOUBLE,
+        fp64: this.use64bitPositions(),
         size: 3,
         accessor: 'getPosition'
       },
-      instancePositions64xy: {
-        size: 2,
-        accessor: 'getPosition',
-        update: this.calculateInstancePositions64xyLow
-      },
       instanceColors: {
+        type: GL.UNSIGNED_BYTE,
         transition: true,
-        size: 4,
+        size: this.props.colorFormat.length,
+        normalized: true,
         accessor: 'getColor',
         defaultValue: [0, 0, 0, 255]
       },
@@ -188,7 +149,7 @@ export default class SimpleMeshLayer extends Layer {
   updateState({props, oldProps, changeFlags}) {
     super.updateState({props, oldProps, changeFlags});
 
-    if (props.mesh !== oldProps.mesh || props.fp64 !== oldProps.fp64) {
+    if (props.mesh !== oldProps.mesh || changeFlags.extensionsChanged) {
       if (this.state.model) {
         this.state.model.delete();
       }
@@ -226,11 +187,13 @@ export default class SimpleMeshLayer extends Layer {
       return;
     }
 
-    const {sizeScale} = this.props;
+    const {viewport} = this.context;
+    const {sizeScale, coordinateSystem} = this.props;
 
     this.state.model.draw({
       uniforms: Object.assign({}, uniforms, {
         sizeScale,
+        composeModelMatrix: shouldComposeModelMatrix(viewport, coordinateSystem),
         flatShade: !this.state.hasNormals
       })
     });
@@ -242,62 +205,37 @@ export default class SimpleMeshLayer extends Layer {
       Object.assign({}, this.getShaders(), {
         id: this.props.id,
         geometry: getGeometry(mesh),
-        isInstanced: true,
-        shaderCache: this.context.shaderCache
+        isInstanced: true
       })
     );
 
-    if (this.state.texture) {
-      model.setUniforms({sampler: this.state.texture, hasTexture: 1});
-    } else {
-      model.setUniforms({sampler: this.state.emptyTexture, hasTexture: 0});
-    }
+    const {texture, emptyTexture} = this.state;
+    model.setUniforms({
+      sampler: texture || emptyTexture,
+      hasTexture: Boolean(texture)
+    });
 
     return model;
   }
 
-  setTexture(src) {
+  setTexture(image) {
     const {gl} = this.context;
-    const {emptyTexture} = this.state;
+    const {emptyTexture, model} = this.state;
 
     if (this.state.texture) {
       this.state.texture.delete();
     }
 
-    if (src) {
-      getTexture(gl, src).then(texture => {
-        this.setState({texture});
-        if (this.state.model) {
-          this.state.model.setUniforms({sampler: this.state.texture, hasTexture: 1});
-        }
+    const texture = image ? getTextureFromData(gl, image) : null;
+    this.setState({texture});
+
+    if (model) {
+      // props.mesh may not be ready at this time.
+      // The sampler will be set when `getModel` is called
+      model.setUniforms({
+        sampler: texture || emptyTexture,
+        hasTexture: Boolean(texture)
       });
-    } else {
-      // reset
-      this.setState({texture: null});
-      if (this.state.model) {
-        this.state.model.setUniforms({sampler: emptyTexture, hasTexture: 0});
-      }
-    }
-  }
-
-  calculateInstancePositions64xyLow(attribute, {startRow, endRow}) {
-    const isFP64 = this.use64bitPositions();
-    attribute.constant = !isFP64;
-
-    if (!isFP64) {
-      attribute.value = new Float32Array(2);
-      return;
-    }
-
-    const {data, getPosition} = this.props;
-    const {value, size} = attribute;
-    let i = startRow * size;
-    const {iterable, objectInfo} = createIterable(data, startRow, endRow);
-    for (const object of iterable) {
-      objectInfo.index++;
-      const position = getPosition(object, objectInfo);
-      value[i++] = fp64LowPart(position[0]);
-      value[i++] = fp64LowPart(position[1]);
     }
   }
 }

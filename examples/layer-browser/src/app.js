@@ -3,53 +3,28 @@
 // deck.gl ES6 components
 import {
   COORDINATE_SYSTEM,
-  View,
   MapView,
   FirstPersonView,
   OrbitView,
-  MapController,
   AmbientLight,
   DirectionalLight,
-  LightingEffect
+  LightingEffect,
+  PostProcessEffect
 } from '@deck.gl/core';
-import {_OrbitController as OrbitController} from '@deck.gl/core';
-
-// deck.gl react components
-import DeckGL from '@deck.gl/react';
+import {SolidPolygonLayer} from '@deck.gl/layers';
 
 import React, {PureComponent} from 'react';
 import autobind from 'react-autobind';
 
-import {StaticMap, _MapContext as MapContext, NavigationControl} from 'react-map-gl';
-
 import {Matrix4} from 'math.gl';
 
-import LayerInfo from './components/layer-info';
 import LayerSelector from './components/layer-selector';
 import LayerControls from './components/layer-controls';
 
 import LAYER_CATEGORIES from './examples';
+import Map from './map';
 
-/* eslint-disable no-process-env */
-const MapboxAccessToken =
-  process.env.MapboxAccessToken || // eslint-disable-line
-  'Set MapboxAccessToken environment variable or put your token here.';
-
-const VIEW_LABEL_STYLES = {
-  zIndex: 10,
-  // position: 'relative',
-  padding: 5,
-  margin: 20,
-  fontSize: 12,
-  backgroundColor: '#282727',
-  color: '#FFFFFF'
-};
-
-const NAVIGATION_CONTROL_STYLES = {
-  margin: 10,
-  position: 'absolute',
-  zIndex: 1
-};
+import {ink} from '@luma.gl/shadertools';
 
 const AMBIENT_LIGHT = new AmbientLight({
   color: [255, 255, 255],
@@ -59,7 +34,14 @@ const AMBIENT_LIGHT = new AmbientLight({
 const DIRECTIONAL_LIGHT = new DirectionalLight({
   color: [255, 255, 255],
   intensity: 3.0,
-  direction: [-3, -9, -1]
+  direction: [-3, -1, -9]
+});
+
+const DIRECTIONAL_LIGHT_SHADOW = new DirectionalLight({
+  color: [255, 255, 255],
+  intensity: 3.0,
+  direction: [-3, -1, -9],
+  _shadow: true
 });
 
 const GLOBAL_LIGHTING = new LightingEffect({
@@ -67,11 +49,14 @@ const GLOBAL_LIGHTING = new LightingEffect({
   DIRECTIONAL_LIGHT
 });
 
-const ViewportLabel = props => (
-  <div style={{position: 'absolute'}}>
-    <div style={{...VIEW_LABEL_STYLES, display: ''}}>{props.children}</div>
-  </div>
-);
+const GLOBAL_LIGHTING_WITH_SHADOW = new LightingEffect({
+  AMBIENT_LIGHT,
+  DIRECTIONAL_LIGHT_SHADOW
+});
+
+const POST_PROCESS = new PostProcessEffect(ink, {strength: 0.5});
+
+const LAND_COVER = [[[-122.3, 37.7], [-122.3, 37.9], [-122.6, 37.9], [-122.6, 37.7]]];
 
 // ---- View ---- //
 export default class App extends PureComponent {
@@ -80,27 +65,12 @@ export default class App extends PureComponent {
     autobind(this);
 
     this.state = props.state || {
-      mapViewState: {
-        latitude: 37.751537058389985,
-        longitude: -122.42694203247012,
-        zoom: 11.5,
-        pitch: 0,
-        bearing: 0
-      },
-      orbitViewState: {
-        lookAt: [0, 0, 0],
-        distance: 3,
-        rotationX: -30,
-        rotationOrbit: 30,
-        orbitAxis: 'Y',
-        fov: 50,
-        minDistance: 1,
-        maxDistance: 20
-      },
       activeExamples: {
         ScatterplotLayer: true
       },
       settings: {
+        shadow: false,
+        postProcessing: false,
         orthographic: false,
         multiview: false,
         infovis: false,
@@ -117,12 +87,12 @@ export default class App extends PureComponent {
         // Effects are experimental for now. Will be enabled in the future
         // effects: false,
       },
-      hoveredItem: null,
-      clickedItem: null,
-      queriedItems: null,
 
-      enableDepthPickOnClick: false
+      enableDepthPickOnClick: false,
+      shakeCamera: false // Shake camera to force rendering every frame
     };
+
+    this.mapRef = React.createRef();
   }
 
   componentDidUpdate(prevProps, prevState) {
@@ -131,19 +101,8 @@ export default class App extends PureComponent {
     }
   }
 
-  componentWillUnmount() {
-    window.removeEventListener('resize', this._onResize);
-  }
-
   _getSize() {
     return {width: window.innerWidth, height: window.innerHeight};
-  }
-
-  _onViewStateChange({viewState}) {
-    if (viewState.pitch > 60) {
-      viewState.pitch = 60;
-    }
-    this.setState({mapViewState: viewState});
   }
 
   _onToggleLayer(exampleName, example) {
@@ -165,30 +124,13 @@ export default class App extends PureComponent {
     this.setState({settings});
   }
 
-  _onHover(info) {
-    this.setState({hoveredItem: info});
-  }
-
-  _onClick(info) {
-    if (this.state.enableDepthPickOnClick && info) {
-      this._multiDepthPick(info.x, info.y);
-    } else {
-      console.log('onClick', info); // eslint-disable-line
-      this.setState({clickedItem: info});
-    }
-  }
-
   _onPickObjects() {
     const {width, height} = this._getSize();
-    const infos = this.refs.deckgl.pickObjects({x: 0, y: 0, width, height});
-    console.log(infos); // eslint-disable-line
-    this.setState({queriedItems: infos});
+    this.mapRef.current.pickObjects({x: 0, y: 0, width, height});
   }
 
-  _multiDepthPick(x, y) {
-    const infos = this.refs.deckgl.pickMultipleObjects({x, y});
-    console.log(infos); // eslint-disable-line
-    this.setState({queriedItems: infos});
+  _multiDepthPick({x, y}) {
+    this.mapRef.current.pickMultipleObjects({x, y, unproject3D: true});
   }
 
   _renderExampleLayer(example, settings, index) {
@@ -211,19 +153,20 @@ export default class App extends PureComponent {
     return new Layer(layerProps);
   }
 
-  // Flatten layer props
-  _getLayerSettings(props) {
-    const settings = {};
-    for (const key in props) {
-      settings[key] = props[key];
-    }
-    return settings;
-  }
-
   /* eslint-disable max-depth */
   _renderExamples() {
     let index = 1;
-    const layers = [];
+    const layers = [
+      // the ground - for shadows to drop on
+      new SolidPolygonLayer({
+        id: 'ground',
+        data: LAND_COVER,
+        getPolygon: f => f,
+        extruded: false,
+        filled: true,
+        getFillColor: [0, 0, 0, 0]
+      })
+    ];
     const {activeExamples} = this.state;
 
     for (const categoryName of Object.keys(LAYER_CATEGORIES)) {
@@ -235,7 +178,7 @@ export default class App extends PureComponent {
           const layer = this._renderExampleLayer(example, settings, index++);
 
           if (typeof settings !== 'object') {
-            activeExamples[exampleName] = this._getLayerSettings(layer.props);
+            activeExamples[exampleName] = LayerControls.getSettings(layer.props);
           }
 
           layers.push(layer);
@@ -254,7 +197,7 @@ export default class App extends PureComponent {
 
     switch (coordinateSystem) {
       case COORDINATE_SYSTEM.METER_OFFSETS:
-      case COORDINATE_SYSTEM.IDENTITY:
+      case COORDINATE_SYSTEM.CARTESIAN:
         const {
           settings: {rotationZ, rotationX}
         } = this.state;
@@ -271,95 +214,63 @@ export default class App extends PureComponent {
   }
 
   _getViews() {
-    const {
-      settings: {infovis, multiview, orthographic}
-    } = this.state;
+    const {infovis, multiview, orthographic} = this.state.settings;
+    let views;
 
     if (infovis) {
-      return new OrbitView({
+      views = new OrbitView({
         id: 'infovis',
-        controller: OrbitController
+        controller: true,
+        fov: 50,
+        minZoom: 0,
+        maxZoom: 20
       });
-    }
-
-    if (multiview) {
-      return [
-        new FirstPersonView({id: 'first-person', height: '50%'}),
+    } else if (multiview) {
+      views = [
+        new FirstPersonView({
+          id: 'first-person',
+          height: '50%',
+          viewState: {id: 'basemap', position: [0, 0, 50]}
+        }),
         new MapView({
           id: 'basemap',
-          controller: MapController,
+          controller: true,
           y: '50%',
           height: '50%',
+          position: [0, 0, 0],
           orthographic
         })
       ];
+    } else {
+      views = new MapView({id: 'basemap', controller: true, position: [0, 0, 0], orthographic});
     }
-    return new MapView({id: 'basemap', controller: MapController, orthographic});
+    return views;
   }
 
-  // Only show infovis layers in infovis mode and vice versa
-  _layerFilter({layer}) {
-    const {settings} = this.state;
-    const isIdentity = layer.props.coordinateSystem === COORDINATE_SYSTEM.IDENTITY;
-    return settings.infovis ? isIdentity : !isIdentity;
-  }
+  _getEffects() {
+    // TODO
+    const {shadow, postProcessing} = this.state.settings;
 
-  _renderMap() {
-    const {orbitViewState, mapViewState, settings} = this.state;
-    const {infovis, effects, pickingRadius, drawPickingColors, useDevicePixels} = settings;
-
-    const views = this._getViews();
-
-    return (
-      <div style={{backgroundColor: '#eeeeee'}}>
-        <DeckGL
-          ref="deckgl"
-          id="default-deckgl-overlay"
-          layers={this._renderExamples()}
-          layerFilter={this._layerFilter}
-          views={views}
-          viewState={infovis ? orbitViewState : {...mapViewState, position: [0, 0, 50]}}
-          onViewStateChange={this._onViewStateChange}
-          effects={effects ? [...this._effects, GLOBAL_LIGHTING] : [GLOBAL_LIGHTING]}
-          pickingRadius={pickingRadius}
-          onHover={this._onHover}
-          onClick={this._onClick}
-          useDevicePixels={useDevicePixels}
-          debug={true}
-          drawPickingColors={drawPickingColors}
-          ContextProvider={MapContext.Provider}
-        >
-          <View id="basemap">
-            <StaticMap
-              key="map"
-              mapStyle="mapbox://styles/mapbox/light-v9"
-              mapboxApiAccessToken={MapboxAccessToken || 'no_token'}
-            />
-            <ViewportLabel key="label">Map View</ViewportLabel>
-          </View>
-
-          <View id="first-person">
-            <ViewportLabel>First Person View</ViewportLabel>
-          </View>
-
-          <View id="infovis">
-            <ViewportLabel>Orbit View (PlotLayer only, No Navigation)</ViewportLabel>
-          </View>
-
-          <div style={NAVIGATION_CONTROL_STYLES}>
-            <NavigationControl onViewStateChange={this._onViewStateChange} />
-          </div>
-        </DeckGL>
-      </div>
-    );
+    return [
+      shadow ? GLOBAL_LIGHTING_WITH_SHADOW : GLOBAL_LIGHTING,
+      postProcessing && POST_PROCESS
+    ].filter(Boolean);
   }
 
   render() {
-    const {settings, activeExamples, hoveredItem, clickedItem, queriedItems} = this.state;
+    const {settings, activeExamples} = this.state;
 
     return (
       <div>
-        {this._renderMap()}
+        <Map
+          ref={this.mapRef}
+          layers={this._renderExamples()}
+          onClick={this.state.enableDepthPickOnClick && this._multiDepthPick}
+          views={this._getViews()}
+          effects={this._getEffects()}
+          settings={settings}
+          shakeCamera={this.state.shakeCamera}
+        />
         <div id="control-panel">
           <div style={{textAlign: 'center', padding: '5px 0 5px'}}>
             <button onClick={this._onPickObjects}>
@@ -371,6 +282,9 @@ export default class App extends PureComponent {
               }
             >
               <b>Multi Depth Pick ({this.state.enableDepthPickOnClick ? 'ON' : 'OFF'})</b>
+            </button>
+            <button onClick={() => this.setState({shakeCamera: !this.state.shakeCamera})}>
+              <b>Shake Camera ({this.state.shakeCamera ? 'ON' : 'OFF'})</b>
             </button>
           </div>
           <LayerControls
@@ -385,12 +299,6 @@ export default class App extends PureComponent {
             onUpdateLayer={this._onUpdateLayerSettings}
           />
         </div>
-        <LayerInfo
-          ref="infoPanel"
-          hovered={hoveredItem}
-          clicked={clickedItem}
-          queried={queriedItems}
-        />
       </div>
     );
   }

@@ -31,7 +31,7 @@ new PointCloudLayer({
 | `COORDINATE_SYSTEM.LNGLAT` (default) | [longitude, latitude, altitude] | meters | Longitude and latitude are specified as [WGS84](https://gisgeography.com/wgs84-world-geodetic-system/) coordinates in degrees from Greenwich meridian / equator respectively, and altitude is specified in meters above sea level. |
 | `COORDINATE_SYSTEM.METER_OFFSETS` *   | [Δx, Δy, Δz]   | meters | Positions are given in meter offsets from a reference geo-location that is specified separately (`coordinateOrigin`). The `x` axis points map east, the `y` axis points map north, and `z` points up. |
 | `COORDINATE_SYSTEM.LNGLAT_OFFSETS`    | [Δlongitude, Δlatitude, Δaltitude]   | meters | Positions are given in meter offsets from a reference geo-location that is specified separately (`coordinateOrigin`). |
-| `COORDINATE_SYSTEM.IDENTITY`         | [x, y, z] | identity units | A linear system with no interpretation for pure info-vis layers. Viewports can be used without supplying geospatial reference points. |
+| `COORDINATE_SYSTEM.CARTESIAN`         | [x, y, z] | identity units | A linear system with no interpretation for pure info-vis layers. Viewports can be used without supplying geospatial reference points. |
 | `COORDINATE_SYSTEM.LNGLAT_DEPRECATED`| [longitude, latitude, altitude] | meters | A lower precision version of the `COORDINATE_SYSTEM.LNGLAT` mode, that was the default until deck.gl v6.2. Will be removed in a future release. |
 
 * Note that although UTM ([Universal Transverse Mercator](https://en.wikipedia.org/wiki/Universal_Transverse_Mercator_coordinate_system)) coordinates uses similar meter offsets as the deck.gl meters mode, be aware there are subtle differences, so be careful before making assumptions.
@@ -77,4 +77,13 @@ The same positions can be drawn differently to screen based on what projection m
 The view is independent of the layers' coordinate systems, and is shared by all layers. So all layers will always pan, zoom and tilt together, regardless of what coordinate system their positions are specified in.
 
 The default view used in deck.gl is the [MapView](/docs/api-reference/map-view.md), which implements the [Web Meractor projection](https://en.wikipedia.org/wiki/Web_Mercator_projection). When working with non-geospatial datasets, the `IDENTITY` coordinate system needs to be used in combination with an alternative view. Read about deck.gl's view system in [Views and Projections](/docs/developer-guide/views.md).
+
+
+## Comparison to Standard 3D Graphics Coordinate Systems
+
+There can be some confusion when mapping between deck.gl's coordinate systems and those typically seen in 3D graphics applications, i.e. model space, world space, view space, clip space.
+
+- deck.gl's world space maps to the standard "model space", i.e. the data that comes in before any transforms have been applied.
+- deck.gl's common space plays the role of standard "world space", but there are a few important differences. The y axis is inverted, which  means it's a left-handed coordinate system. The mercator "zoom" factor is applied as a common space transform (rather than in the view or projection transforms).
+- The view transform in deck.gl includes a scaling of the z axis by 1 / height of the screen in pixel. This is done to line up mercator pixels with screen pixels, but also means the "near" and "far" distances used in the perspective transform are not the true distances, but numbers scaled down by the same factor.
 

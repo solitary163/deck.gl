@@ -2,7 +2,6 @@
 
 <p class="badges">
   <img src="https://img.shields.io/badge/@deck.gl/layers-lightgrey.svg?style=flat-square" alt="@deck.gl/layers" />
-  <img src="https://img.shields.io/badge/fp64-yes-blue.svg?style=flat-square" alt="64-bit" />
   <img src="https://img.shields.io/badge/lighting-yes-blue.svg?style=flat-square" alt="lighting" />
 </p>
 
@@ -64,10 +63,10 @@ new PointCloudLayer({});
 To use pre-bundled scripts:
 
 ```html
-<script src="https://unpkg.com/@deck.gl@~7.0.0/dist.min.js"></script>
+<script src="https://unpkg.com/deck.gl@^8.0.0/dist.min.js"></script>
 <!-- or -->
-<script src="https://unpkg.com/@deck.gl/core@~7.0.0/dist.min.js"></script>
-<script src="https://unpkg.com/@deck.gl/layers@~7.0.0/dist.min.js"></script>
+<script src="https://unpkg.com/@deck.gl/core@^8.0.0/dist.min.js"></script>
+<script src="https://unpkg.com/@deck.gl/layers@^8.0.0/dist.min.js"></script>
 ```
 
 ```js
@@ -86,24 +85,18 @@ Inherits from all [Base Layer](/docs/api-reference/layer.md) properties.
 
 The units of the point size, one of `'meters'`, `'pixels'`. When zooming in and out, meter sizes scale with the base map, and pixel sizes remain the same on screen.
 
-##### `pointSize` (Number, optional)
+##### `pointSize` (Number, optional) ![transition-enabled](https://img.shields.io/badge/transition-enabled-green.svg?style=flat-square")
 
 * Default: `10`
 
 Global radius of all points, in units specified by `sizeUnits` (default pixels).
 
-##### `fp64` (Boolean, optional)
-
-* Default: `false`
-
-Whether the layer should be rendered in high-precision 64-bit mode. Note that since deck.gl v6.1, the default 32-bit projection uses a hybrid mode that matches 64-bit precision with significantly better performance.
-
 ##### `material` (Object, optional)
 
-* Default: `new PhongMaterial()`
+* Default: `true`
 
-This is an object that contains material props for [lighting effect](/docs/effects/lighting-effect.md).
-Check [PhongMaterial](https://github.com/uber/luma.gl/tree/7.0-release/docs/api-reference/core/materials/phong-material.md) for more details.
+This is an object that contains material props for [lighting effect](/docs/effects/lighting-effect.md) applied on extruded polygons.
+Check [the lighting guide](/docs/developer-guide/using-lighting.md#constructing-a-material-instance) for configurable settings.
 
 ### Data Accessors
 
@@ -127,7 +120,7 @@ The normal of each object, in `[nx, ny, nz]`.
 
 * Default: `[0, 0, 0, 255]`
 
-The rgba color of each object, in `r, g, b, [a]`. Each component is in the 0-255 range.
+The rgba color is in the format of `[r, g, b, [a]]`. Each channel is a number between 0-255 and `a` is 255 if not supplied.
 
 * If an array is provided, it is used as the color for all objects.
 * If a function is provided, it is called on each object to retrieve its color.
@@ -135,4 +128,3 @@ The rgba color of each object, in `r, g, b, [a]`. Each component is in the 0-255
 ## Source
 
 [modules/layers/src/point-cloud-layer](https://github.com/uber/deck.gl/tree/master/modules/layers/src/point-cloud-layer)
-

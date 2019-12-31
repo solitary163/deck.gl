@@ -19,6 +19,7 @@
 // THE SOFTWARE.
 
 import {LayerManager, MapView, DeckRenderer} from '@deck.gl/core';
+import {VertexArrayObject} from '@luma.gl/webgl';
 
 import {makeSpy} from '@probe.gl/test-utils';
 import gl from './utils/setup-gl';
@@ -87,9 +88,9 @@ export function testDrawLayer({
     () => {
       layerManager.setLayers([layer]);
       deckRenderer.renderLayers({
-        viewports: [testViewport],
+        viewports: [viewport],
         layers: layerManager.getLayers(),
-        activateViewport: layerManager.activateViewport
+        onViewportActive: layerManager.activateViewport
       });
     },
     onError
@@ -101,14 +102,19 @@ export function testDrawLayer({
 export function testLayer({
   Layer,
   viewport = testViewport,
+  timeline = null,
   testCases = [],
   spies = [],
   onError = defaultOnError
 }) {
   // assert(Layer);
 
-  const layerManager = new LayerManager(gl, {viewport});
+  const layerManager = new LayerManager(gl, {viewport, timeline});
   const deckRenderer = new DeckRenderer(gl);
+
+  layerManager.context.animationProps = {
+    time: 0
+  };
 
   const initialProps = testCases[0].props;
   const layer = new Layer(initialProps);
@@ -120,6 +126,13 @@ export function testLayer({
   runLayerTests(layerManager, deckRenderer, layer, testCases, spies, onError);
 
   safelyCall(`finalizing ${layer.id}`, () => layerManager.setLayers([]), onError);
+
+  // Edge case handling: when VertexArrayObject is not supported, we create a
+  // constant buffer for attribute zero which is not deleted with the program
+  // TODO - fix in luma?
+  if (!VertexArrayObject.isSupported(gl) && VertexArrayObject.getDefaultArray(gl).buffer) {
+    VertexArrayObject.getDefaultArray(gl).delete();
+  }
 
   const resourceCounts = getResourceCounts();
 
@@ -156,23 +169,18 @@ function injectSpies(layer, spies) {
 
 /* eslint-disable max-params, no-loop-func */
 function runLayerTests(layerManager, deckRenderer, layer, testCases, spies, onError) {
-  let combinedProps = {};
-
   // Run successive update tests
   for (let i = 0; i < testCases.length; i++) {
     const testCase = testCases[i];
-    const {props, updateProps, onBeforeUpdate, onAfterUpdate} = testCase;
+    const {
+      props,
+      updateProps,
+      onBeforeUpdate,
+      onAfterUpdate,
+      viewport = layerManager.context.viewport
+    } = testCase;
 
     spies = testCase.spies || spies;
-
-    // Test case can reset the props on every iteration
-    if (props) {
-      combinedProps = Object.assign({}, props);
-    }
-    // Test case can override with new props on every iteration
-    if (updateProps) {
-      Object.assign(combinedProps, updateProps);
-    }
 
     // copy old state before update
     const oldState = Object.assign({}, layer.state);
@@ -181,7 +189,14 @@ function runLayerTests(layerManager, deckRenderer, layer, testCases, spies, onEr
       onBeforeUpdate({layer, testCase});
     }
 
-    layer = layer.clone(combinedProps);
+    if (props) {
+      // Test case can reset the props on every iteration
+      layer = new layer.constructor(props);
+    } else if (updateProps) {
+      // Test case can override with new props on every iteration
+      layer = layer.clone(updateProps);
+    }
+
     // Create a map of spies that the test case can inspect
     const spyMap = injectSpies(layer, spies);
 
@@ -192,9 +207,9 @@ function runLayerTests(layerManager, deckRenderer, layer, testCases, spies, onEr
       `drawing ${layer.id}`,
       () =>
         deckRenderer.renderLayers({
-          viewports: [testViewport],
+          viewports: [viewport],
           layers: layerManager.getLayers(),
-          activateViewport: layerManager.activateViewport
+          onViewportActive: layerManager.activateViewport
         }),
       onError
     );
@@ -213,4 +228,4 @@ function runLayerTests(layerManager, deckRenderer, layer, testCases, spies, onEr
     Object.keys(spyMap).forEach(k => spyMap[k].reset());
   }
 }
-/* eslint-enable parameters, no-loop-func */
+/* eslint-enable max-params, no-loop-func */

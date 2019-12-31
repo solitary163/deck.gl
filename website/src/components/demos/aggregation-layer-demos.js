@@ -1,7 +1,16 @@
+/* eslint-disable import/namespace, import/default, import/no-extraneous-dependencies */
 import createLayerDemoClass from './layer-demo-base';
 import {DATA_URI} from '../../constants/defaults';
 
-import {ContourLayer, GridLayer, GridCellLayer, HexagonLayer, ScreenGridLayer} from 'deck.gl';
+import {
+  ContourLayer,
+  CPUGridLayer,
+  HexagonLayer,
+  ScreenGridLayer,
+  GPUGridLayer,
+  GridLayer,
+  HeatmapLayer
+} from '@deck.gl/aggregation-layers';
 
 export const ContourLayerDemo = createLayerDemoClass({
   Layer: ContourLayer,
@@ -10,7 +19,6 @@ export const ContourLayerDemo = createLayerDemoClass({
   props: {
     pickable: true,
     cellSize: 200,
-    elevationScale: 4,
     getPosition: d => d.COORDINATES,
     contours: [
       {threshold: 1, color: [255, 0, 0], strokeWidth: 2, zIndex: 1},
@@ -21,23 +29,7 @@ export const ContourLayerDemo = createLayerDemoClass({
   }
 });
 
-export const GridCellLayerDemo = createLayerDemoClass({
-  Layer: GridCellLayer,
-  dataUrl: `${DATA_URI}/hexagons.json`,
-  formatTooltip: d => `height: ${d.value * 5000}m`,
-  props: {
-    pickable: true,
-    extruded: true,
-    cellSize: 200,
-    elevationScale: 5000,
-    getPosition: d => d.centroid,
-    getColor: d => [48, 128, d.value * 255, 255],
-    getElevation: d => d.value
-  }
-});
-
-export const GridLayerDemo = createLayerDemoClass({
-  Layer: GridLayer,
+const GRID_LAYER_INFO = {
   dataUrl: `${DATA_URI}/sf-bike-parking.json`,
   formatTooltip: d => `${d.position.join(', ')}\nCount: ${d.count}`,
   props: {
@@ -47,6 +39,21 @@ export const GridLayerDemo = createLayerDemoClass({
     elevationScale: 4,
     getPosition: d => d.COORDINATES
   }
+};
+
+export const GPUGridLayerDemo = createLayerDemoClass({
+  Layer: GPUGridLayer,
+  ...GRID_LAYER_INFO
+});
+
+export const GridLayerDemo = createLayerDemoClass({
+  Layer: GridLayer,
+  ...GRID_LAYER_INFO
+});
+
+export const CPUGridLayerDemo = createLayerDemoClass({
+  Layer: CPUGridLayer,
+  ...GRID_LAYER_INFO
 });
 
 export const HexagonLayerDemo = createLayerDemoClass({
@@ -79,5 +86,16 @@ export const ScreenGridLayerDemo = createLayerDemoClass({
     ],
     getPosition: d => d.COORDINATES,
     getWeight: d => d.SPACES
+  }
+});
+
+export const HeatmapLayerDemo = createLayerDemoClass({
+  Layer: HeatmapLayer,
+  dataUrl: `${DATA_URI}/sf-bike-parking.json`,
+  formatTooltip: d => 'heatmap',
+  props: {
+    pickable: false,
+    getPosition: d => d.COORDINATES,
+    radiusPixels: 25
   }
 });

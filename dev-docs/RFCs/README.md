@@ -14,12 +14,13 @@ Also see luma.gl roadmaps, such as the GPGPU roadmap
 
 | Roadmap                                                            | Status       | Description |
 | ---                                                                | ---          | ---         |
+| [**GPU Table Roadmap**](../roadmaps/gpu-table-roadmap.md)  | Draft        | Evolution of the `GPUTable` class across deck.gl v8.x releases |
 | [**API Evolution Roadmap**](../roadmaps/api-evolution-roadmap.md)  | Draft        | Ideas for changes/extensions to the core deck.gl API |
 | [**New Layers Roadmap**](../roadmaps/layers-roadmap.md)            | Draft        | Ideas for new layers |
 | [**Animation Roadmap**](../roadmaps/animation-roadmap.md)          | Draft        | Animation API roadmap |
 | [**Performance Roadmap**](../roadmaps/performance-roadmap.md)      | Draft        | Performance Improvements |
 | [**Infovis Roadmap**](../roadmaps/infovis-roadmap.md)              | Draft        | Infovis (non-geospatial) features roadmap |
-| [**Reduce Distribution Size**](../roadmaps/dist-size-roadmap.md)   | Ongoing      | Reduce size of distribution and the bundle size of applications using deck.gl |
+| [**Reduce Distribution Size**](../roadmaps/dist-size-roadmap.md)   | Implemented  | Reduce size of distribution and the bundle size of applications using deck.gl |
 | [**Pure JS and Scripting Roadmap**](../roadmaps/purejs-roadmap.md) | Implemented  | Support for Scripting and Pure-JS APIs |
 
 
@@ -29,10 +30,15 @@ These RFCs are not yet associated with any specific release.
 
 | RFC | Author | Status | Description |
 | --- | --- | --- | --- |
+| [**Mobile Platform RFC**](vNext/mobile-platform-support-rfc.md) | @ibgreen, @tsherif, @pessimistress | **Draft** | Strategy for using deck.gl in native mobile clients. |
 | [**Reduce Repository Size**](vNext/reduce-repo-size-rfc.md) | @ibgreen | **Draft** | Reduce size of deck.gl github repository |
 | [**Projection Mode Improvements**](vNext/projection-mode-improvements-rfc.md) | @ibgreen @pessimistress | **Draft** | Improvements to projection system |
 | [**Composite Layer Customization**](vNext/composite-layer-customization-rfc.md) | @ibgreen | **Draft** | Improvements to customizing composite layers |
-| **[Render Layer to Texture](vNext/render-layer-to-texture-rfc.md)** | TBD | Proposed | Allow layers to render to texture and then use texture in subsequent layers.  |
+| [**Render Layer to Texture**](vNext/render-layer-to-texture-rfc.md) | TBD | Proposed | Allow layers to render to texture and then use texture in subsequent layers.  |
+| [**Layer Extension**](vNext/layer-extension-rfc.md) | @pessimistress | **Draft** | Adding optional functionalities to layers on-demand |
+| [**Fixed Frame Coordinate System**](vNext/fixed-frame-coordinates-rfc.md) | @ibgreen | Draft | Add support for fixed frame (WGS84 cartesian) coordinates |
+| [**Component Wrapping System**](vNext/component-wrapping-rfc.md) | @ibgreen | **Draft** | A unified system for exposing JS components to Python/Jupyter Notebook/JSON etc. |
+| [**Projection System Expansion**](v8.0/projection-system-expansion-rfc.md) | @pessimistress | **Draft** | Changes to the projection system to support various data and projection formats. |
 
 Possible other animation related RFCs:
 - integration with event handling (enter leave triggers for animations)
@@ -47,17 +53,17 @@ Possible other animation related RFCs:
 | [**Unified ViewState**](vNext/view-state-rfc.md) | @ibgreen | **Deferred** | Controversial proposal for an even more Unified View/Controller Architecture. Review again after all Controller/Multiview RFCs have been approved/implemented |
 
 
-## v7.x Binary Data RFCs
+## v8.x Binary Data RFCs
 
 Group of related RFCs loosely targeted for 7.x releases.
 
 | RFC | Author | Status | Description |
 | --- | ---    | ---    | ---         |
-| [**Binary Data RFC**](v7.x-binary/binary-data-rfc.md) | @ibgreen @pessimistress | **Draft** | Support binary data as input to deck.gl layers. |
 | [**GLSL Accessor RFC**](/dev-docs/v7.x-binary/glsl-accessor-rfc.md) | @ibgreen | **Draft** | Allow apps to define GLSL accessors to directly access injected columnar data or implement advanved effects |
 | [**Texture Attribute RFC**](/dev-docs/v7.x-binary/texture-attribute-rfc.md) | @ibgreen | **Draft** | Enable variable-primitive layers_ to read _descriptive attributes_ from a binary column. |
 | [**GPU Data Frame Support**](/dev-docs/v7.x-binary/gpu-data-frame-rfc.md) | @ibgreen | **Draft** | Proposal for enabling deck.gl to apply data frame filters on GPU. |
 | [**Chunked Data Support**](/dev-docs/v7.x-binary/chunked-data-rfc.md) | @ibgreen | **Draft** | Support Chunked Columnar data on the GPU. |
+| [**Binary Support Improvements**](/dev-docs/v7.x-binary/chunked-data-rfc.md) | @pessimistress | **Draft** | API change for more intuitive binary data usage. |
 
 
 ## v7.x RFCs
@@ -66,15 +72,37 @@ RFCs loosely targeted for 7.x releases. Also see [luma.gl RFCs](https://github.c
 
 | RFC | Author | Status | Description |
 | --- | ---    | ---    | ---         |
+| [**Binary Data RFC**](v7.x-binary/binary-data-rfc.md) | @ibgreen @pessimistress | **Draft** | Support binary data as input to deck.gl layers. |
 | [**Imperative API Improvements**](v7.x/imperative-api-rfc.md) | @ibgreen | **draft** | Potential API improvements for imperative programming. |
 | [**Partial Updates**](vNext/partial-updates-rfc.md) | @ibgreen @georgios-uber | **draft** | Allow partial updates of vertex attributes to support high-performance editing. |
 | [**Project / Unproject Improvements**](v7.x/project-unproject-rfc.md) | @ibgreen | **Draft** | Consolidating, generalizing and simplifying JS `project`/`unproject` API, covering uses from new features such as MultiView. |
 | [**Layer Operations**](v7.x/layer-and-group-operation-rfc.md) | @ibgreen| **Preliminary Approval** | Allow partial updates of vertex attributes to support high-performance editing. |
 | [**Property Animation**](v7.x/property-animation-rfc.md) | @ibgreen | Draft | Allow Layer props and GL parameters to accept functions in addition to values and call these on every render to update values |
+| [**Heatmap Layer**](v7.x/heatmap-layer-rfc.md) | @1chandu | Draft | A new layer to render heat maps with GPU Acceleration |
+
+## V7.1 RFCs
+
+These RFCS were implemented in v7.1.
+
+| RFC | Author | Status | Description |
+| --- | ---    | ---    | ---         |
+| [**GPU Acceleration in GridLayer**](v7.1/gpu-grid-layer.md) | @1chandu | **Implemented** | GPU Accelerated aggregation support in GridLayer. |
+
+
+## v7.2 RFCs
+
+| RFC | Author | Status | Description |
+| --- | ---    | ---    | ---         |
+| [**Layer Culling**](v7.x/layer-culling-rfc.md) | @ibgreen | **Draft** | Implement Frustum Culling for deck.gl layers, initially as opt-in system|
+
+## v7.1 RFCs
+
+| RFC | Author | Status | Description |
+| --- | ---    | ---    | ---         |
 
 ## v7.0 RFCs
 
-These RFCS are currently targeted for v7.0. Also see [luma.gl RFCs](https://github.com/uber/luma.gl/tree/master/dev-docs/RFCs#v70-rfcs).
+These RFCS were implemented in v7.0. Also see [luma.gl RFCs](https://github.com/uber/luma.gl/tree/master/dev-docs/RFCs#v70-rfcs).
 
 | RFC | Author | Status | Description |
 | --- | ---    | ---    | ---         |
@@ -91,6 +119,7 @@ These RFCS were implemented in v6.3. Also see [luma.gl RFCs](https://github.com/
 | --- | ---    | ---    | ---         |
 | [**Prop Types**](v6.3/prop-types-rfc.md) | @ibgreen | **Implemented** | Validate e.g ranges for numeric attributes, support animation/auto-interpolation. |
 | [**Advanced Event Handling**](v6.3/event-handling.md) | @pessimistress | Draft | Allow Layer props to accept *on<Event>* style callbacks for events other than hover and click |
+| [**GPU Aggregation enhancements**](v6.3/gpu-aggregator-enhancements.md) | @1chandu | **Implemented** | Enhance GPUGridAggregator to support multiple aggregation operations and aggregation of up to 3 weights  |
 
 
 ## v6.2 RFCs
@@ -111,7 +140,7 @@ These RFCS were implmented in v6.1. Also see [luma.gl RFCs](https://github.com/u
 | [**JSON Layers**](v6.1/json-layers-rfc.md) | @ibgreen| **Preliminary Approval** | Enable deck.gl layers to be specified as JSON payloads. |
 | [**View Class Extensions**](v6.1/view-class-extension-rfc.md) | @ibgreen| **Review** | Additional View Class properties that enable e.g. "nested" maps (minimap on top of main map). |
 | [**Property Animation (Phase 1)**](v6.x/property-animation-rfc.md) | @ibgreen | Draft | Allow Layer props and GL parameters to accept functions in addition to values and call these on every render to update values |
-| [**Contour Layer**](v6.1/contour-layer-rfc.md) | @1chandy | **Preliminary Approval** | Contour detecting aggregating layer. |
+| [**Contour Layer**](v6.1/contour-layer-rfc.md) | @1chandu | **Preliminary Approval** | Contour detecting aggregating layer. |
 | [**Improved 32 bit Projection Mode**](v6.1/improved-lnglat-projection-rfc.md.md) | @ibgreen @georgios-uber | **Implemented** | New projection mode for mixed 32/64 bit precision. |
 
 

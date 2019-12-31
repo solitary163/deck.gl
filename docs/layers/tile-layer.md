@@ -2,7 +2,6 @@
 
 <p class="badges">
   <img src="https://img.shields.io/badge/@deck.gl/geo--layers-lightgrey.svg?style=flat-square" alt="@deck.gl/geo-layers" />
-  <img src="https://img.shields.io/badge/fp64-yes-blue.svg?style=flat-square" alt="64-bit" />
   <img src="https://img.shields.io/badge/lighting-yes-blue.svg?style=flat-square" alt="lighting" />
 </p>
 
@@ -81,11 +80,11 @@ new TileLayer({});
 To use pre-bundled scripts:
 
 ```html
-<script src="https://unpkg.com/@deck.gl@~7.0.0/dist.min.js"></script>
+<script src="https://unpkg.com/deck.gl@^8.0.0/dist.min.js"></script>
 <!-- or -->
-<script src="https://unpkg.com/@deck.gl/core@~7.0.0/dist.min.js"></script>
-<script src="https://unpkg.com/@deck.gl/layers@~7.0.0/dist.min.js"></script>
-<script src="https://unpkg.com/@deck.gl/geo-layers@~7.0.0/dist.min.js"></script>
+<script src="https://unpkg.com/@deck.gl/core@^8.0.0/dist.min.js"></script>
+<script src="https://unpkg.com/@deck.gl/layers@^8.0.0/dist.min.js"></script>
+<script src="https://unpkg.com/@deck.gl/geo-layers@^8.0.0/dist.min.js"></script>
 ```
 
 ```js
@@ -117,15 +116,15 @@ The maximum cache size for a tile layer. If not defined, it is calculated using 
 
 ### Render Options
 
-##### `onViewportLoaded` (Function, optional)
+##### `onViewportLoad` (Function, optional)
 
-`onViewportLoaded` is a function that is called when all tiles in the current viewport are loaded. Data in the viewport is passed in as an array to this callback function.
+`onViewportLoad` is a function that is called when all tiles in the current viewport are loaded. Data in the viewport is passed in as an array to this callback function.
 
-- Default: `onViewportLoaded: (data) => null`
+- Default: `onViewportLoad: (data) => null`
 
 ##### `getTileData` (Function,  optional)
 
-`getTileData` given x, y, z indices of the tile, returns a Promise that resolves to the decoded tile data.
+`getTileData` given x, y, z indices of the tile, returns the tile data or a Promise that resolves to the tile data.
 
 - Default: `getTileData: ({x, y, z}) => Promise.resolve(null)`
 

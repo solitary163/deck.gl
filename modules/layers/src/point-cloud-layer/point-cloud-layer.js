@@ -18,37 +18,53 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
-import {Layer, createIterable} from '@deck.gl/core';
+import {Layer, project32, gouraudLighting, picking} from '@deck.gl/core';
 import GL from '@luma.gl/constants';
-import {Model, Geometry, fp64, PhongMaterial} from '@luma.gl/core';
-const {fp64LowPart} = fp64;
+import {Model, Geometry} from '@luma.gl/core';
 
 import vs from './point-cloud-layer-vertex.glsl';
 import fs from './point-cloud-layer-fragment.glsl';
 
 const DEFAULT_COLOR = [0, 0, 0, 255];
 const DEFAULT_NORMAL = [0, 0, 1];
-const defaultMaterial = new PhongMaterial();
 
 const defaultProps = {
   sizeUnits: 'pixels',
   pointSize: {type: 'number', min: 0, value: 10}, //  point radius in pixels
-  fp64: false,
 
   getPosition: {type: 'accessor', value: x => x.position},
   getNormal: {type: 'accessor', value: DEFAULT_NORMAL},
   getColor: {type: 'accessor', value: DEFAULT_COLOR},
 
-  material: defaultMaterial,
+  material: true,
 
   // Depreated
   radiusPixels: {deprecatedFor: 'pointSize'}
 };
 
+// support loaders.gl point cloud format
+function normalizeData(data) {
+  const {header, attributes} = data;
+  if (!header || !attributes) {
+    return;
+  }
+
+  data.length = header.vertexCount;
+
+  if (attributes.POSITION) {
+    attributes.instancePositions = attributes.POSITION;
+  }
+  if (attributes.NORMAL) {
+    attributes.instanceNormals = attributes.NORMAL;
+  }
+  if (attributes.COLOR_0) {
+    attributes.instanceColors = attributes.COLOR_0;
+  }
+}
+
 export default class PointCloudLayer extends Layer {
   getShaders(id) {
-    const projectModule = this.use64bitProjection() ? 'project64' : 'project32';
-    return {vs, fs, modules: [projectModule, 'gouraud-lighting', 'picking']};
+    return super.getShaders({vs, fs, modules: [project32, gouraudLighting, picking]});
   }
 
   initializeState() {
@@ -56,13 +72,10 @@ export default class PointCloudLayer extends Layer {
     this.getAttributeManager().addInstanced({
       instancePositions: {
         size: 3,
+        type: GL.DOUBLE,
+        fp64: this.use64bitPositions(),
         transition: true,
         accessor: 'getPosition'
-      },
-      instancePositions64xyLow: {
-        size: 2,
-        accessor: 'getPosition',
-        update: this.calculateInstancePositions64xyLow
       },
       instanceNormals: {
         size: 3,
@@ -71,8 +84,9 @@ export default class PointCloudLayer extends Layer {
         defaultValue: DEFAULT_NORMAL
       },
       instanceColors: {
-        size: 4,
+        size: this.props.colorFormat.length,
         type: GL.UNSIGNED_BYTE,
+        normalized: true,
         transition: true,
         accessor: 'getColor',
         defaultValue: DEFAULT_COLOR
@@ -83,13 +97,16 @@ export default class PointCloudLayer extends Layer {
 
   updateState({props, oldProps, changeFlags}) {
     super.updateState({props, oldProps, changeFlags});
-    if (props.fp64 !== oldProps.fp64) {
+    if (changeFlags.extensionsChanged) {
       const {gl} = this.context;
       if (this.state.model) {
         this.state.model.delete();
       }
       this.setState({model: this._getModel(gl)});
       this.getAttributeManager().invalidateAll();
+    }
+    if (changeFlags.dataChanged) {
+      normalizeData(props.data);
     }
   }
 
@@ -126,31 +143,9 @@ export default class PointCloudLayer extends Layer {
             positions: new Float32Array(positions)
           }
         }),
-        isInstanced: true,
-        shaderCache: this.context.shaderCache
+        isInstanced: true
       })
     );
-  }
-
-  calculateInstancePositions64xyLow(attribute, {startRow, endRow}) {
-    const isFP64 = this.use64bitPositions();
-    attribute.constant = !isFP64;
-
-    if (!isFP64) {
-      attribute.value = new Float32Array(2);
-      return;
-    }
-
-    const {data, getPosition} = this.props;
-    const {value, size} = attribute;
-    let i = startRow * size;
-    const {iterable, objectInfo} = createIterable(data, startRow, endRow);
-    for (const object of iterable) {
-      objectInfo.index++;
-      const position = getPosition(object, objectInfo);
-      value[i++] = fp64LowPart(position[0]);
-      value[i++] = fp64LowPart(position[1]);
-    }
   }
 }
 

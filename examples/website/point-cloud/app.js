@@ -1,7 +1,9 @@
 /* eslint-disable no-unused-vars */
 import React, {PureComponent} from 'react';
 import {render} from 'react-dom';
-import DeckGL, {COORDINATE_SYSTEM, PointCloudLayer, OrbitView, LinearInterpolator} from 'deck.gl';
+import DeckGL from '@deck.gl/react';
+import {COORDINATE_SYSTEM, OrbitView, LinearInterpolator} from '@deck.gl/core';
+import {PointCloudLayer} from '@deck.gl/layers';
 
 import {LASWorkerLoader} from '@loaders.gl/las';
 // import {PLYWorkerLoader} from '@loaders.gl/ply';
@@ -32,21 +34,17 @@ const INITIAL_VIEW_STATE = {
 
 const transitionInterpolator = new LinearInterpolator(['rotationOrbit']);
 
-export class App extends PureComponent {
+export default class App extends PureComponent {
   constructor(props) {
     super(props);
 
     this.state = {
-      viewState: INITIAL_VIEW_STATE,
-      pointsCount: 0,
-      points: null
+      viewState: INITIAL_VIEW_STATE
     };
 
     this._onLoad = this._onLoad.bind(this);
     this._onViewStateChange = this._onViewStateChange.bind(this);
     this._rotateCamera = this._rotateCamera.bind(this);
-
-    load(LAZ_SAMPLE).then(this._onLoad);
   }
 
   _onViewStateChange({viewState}) {
@@ -58,63 +56,53 @@ export class App extends PureComponent {
     this.setState({
       viewState: {
         ...viewState,
-        rotationOrbit: viewState.rotationOrbit + 30,
-        transitionDuration: 600,
+        rotationOrbit: viewState.rotationOrbit + 120,
+        transitionDuration: 2400,
         transitionInterpolator,
         onTransitionEnd: this._rotateCamera
       }
     });
   }
 
-  _onLoad({header, loaderData, attributes, progress}) {
+  _onLoad({header, loaderData, progress}) {
     // metadata from LAZ file header
     const {mins, maxs} = loaderData.header;
-    let {viewState} = this.state;
 
     if (mins && maxs) {
       // File contains bounding box info
-      viewState = {
-        ...viewState,
-        target: [(mins[0] + maxs[0]) / 2, (mins[1] + maxs[1]) / 2, (mins[2] + maxs[2]) / 2],
-        /* global window */
-        zoom: Math.log2(window.innerWidth / (maxs[0] - mins[0])) - 1
-      };
+      this.setState(
+        {
+          viewState: {
+            ...this.state.viewState,
+            target: [(mins[0] + maxs[0]) / 2, (mins[1] + maxs[1]) / 2, (mins[2] + maxs[2]) / 2],
+            /* global window */
+            zoom: Math.log2(window.innerWidth / (maxs[0] - mins[0])) - 1
+          }
+        },
+        this._rotateCamera
+      );
     }
 
     if (this.props.onLoad) {
       this.props.onLoad({count: header.vertexCount, progress: 1});
     }
-
-    this.setState(
-      {
-        pointsCount: header.vertexCount,
-        points: attributes.POSITION.value,
-        viewState
-      },
-      this._rotateCamera
-    );
-  }
-
-  _renderLayers() {
-    const {pointsCount, points} = this.state;
-
-    return [
-      points &&
-        new PointCloudLayer({
-          id: 'laz-point-cloud-layer',
-          coordinateSystem: COORDINATE_SYSTEM.IDENTITY,
-          numInstances: pointsCount,
-          instancePositions: points,
-          getNormal: [0, 1, 0],
-          getColor: [255, 255, 255],
-          opacity: 0.5,
-          pointSize: 0.5
-        })
-    ];
   }
 
   render() {
     const {viewState} = this.state;
+
+    const layers = [
+      new PointCloudLayer({
+        id: 'laz-point-cloud-layer',
+        data: LAZ_SAMPLE,
+        onDataLoad: this._onLoad,
+        coordinateSystem: COORDINATE_SYSTEM.CARTESIAN,
+        getNormal: [0, 1, 0],
+        getColor: [255, 255, 255],
+        opacity: 0.5,
+        pointSize: 0.5
+      })
+    ];
 
     return (
       <DeckGL
@@ -122,9 +110,9 @@ export class App extends PureComponent {
         viewState={viewState}
         controller={true}
         onViewStateChange={this._onViewStateChange}
-        layers={this._renderLayers()}
+        layers={layers}
         parameters={{
-          clearColor: [0.07, 0.14, 0.19, 1]
+          clearColor: [0.93, 0.86, 0.81, 1]
         }}
       />
     );

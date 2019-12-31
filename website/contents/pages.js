@@ -1,3 +1,5 @@
+const PRE_MATCH_REGEX = /(GeoJson|3D|API|DeckGL|JSON)/g;
+
 function getDocUrl(filename) {
   // DOCS_DIR specified in webpack config file
   // eslint-disable-next-line no-undef
@@ -19,9 +21,15 @@ function generatePath(tree, parentPath = '', depth = 0) {
 
   tree.depth = depth;
   if (tree.name) {
+    // pre-match GeoJson|3D|API|DeckGL|JSON
+    // use `#` to take up pre-matched' space
+    // then replace `#` with pre-match results
+    const matches = tree.name.match(PRE_MATCH_REGEX);
     tree.path = tree.name
-      .match(/(GeoJson|3D|API|DeckGL|JSON|[A-Z]*[a-z'0-9\.]+|\d+)/g)
+      .replace(PRE_MATCH_REGEX, '#')
+      .match(/(#|[A-Z]*[a-z'0-9\.]+|\d+)/g)
       .join('-')
+      .replace('#', _ => matches.shift())
       .toLowerCase()
       .replace(/[^\w-]/g, '');
   }
@@ -57,7 +65,7 @@ export const examplePages = generatePath([
       {
         name: 'HexagonLayer',
         content: {
-          demo: 'HeatmapDemo',
+          demo: 'HexagonDemo',
           code: getCodeUrl('examples/website/3d-heatmap')
         }
       },
@@ -130,6 +138,20 @@ export const examplePages = generatePath([
           demo: 'TripsDemo',
           code: getCodeUrl('examples/website/trips')
         }
+      },
+      {
+        name: 'HeatmapLayer',
+        content: {
+          demo: 'HeatmapDemo',
+          code: getCodeUrl('examples/website/heatmap')
+        }
+      },
+      {
+        name: 'Tile3DLayer',
+        content: {
+          demo: 'Tiles3DDemo',
+          code: getCodeUrl('examples/website/3d-tiles')
+        }
       }
     ]
   },
@@ -145,11 +167,28 @@ export const examplePages = generatePath([
         }
       },
       {
+        name: 'Data Filter',
+        content: {
+          demo: 'DataFilterDemo',
+          code: getCodeUrl('examples/website/data-filter')
+        }
+      },
+      {
         name: '3D Surface Explorer',
         content: {
           demo: 'PlotDemo',
           code: getCodeUrl('examples/website/plot')
         }
+      }
+    ]
+  },
+  {
+    name: 'Declarative Layers',
+    expanded: true,
+    children: [
+      {
+        name: 'Playground',
+        external: 'http://deck.gl/playground'
       }
     ]
   }
@@ -159,6 +198,19 @@ export const showcasePages = generatePath([
   {
     name: 'Overview',
     content: 'markdown/showcase.md'
+  },
+  {
+    name: 'Isochronic Map',
+    external: 'http://pessimistress.github.io/isochronic-map/'
+  },
+  {
+    name: 'Simulating the 2016 Primary',
+    external: 'http://mcvs.thesunstirade.com/'
+  },
+  {
+    name: 'The Bad Bet',
+    external:
+      'https://features.propublica.org/the-bad-bet/how-illinois-bet-on-video-gambling-and-lost/'
   },
   {
     name: 'SandDance',
@@ -182,7 +234,7 @@ export const showcasePages = generatePath([
   },
   {
     name: 'Kepler.gl',
-    external: 'https://uber.github.io/kepler.gl/'
+    external: 'https://kepler.gl/'
   },
   {
     name: 'Wind Map',
@@ -325,6 +377,10 @@ export const docPages = generatePath([
             content: getDocUrl('developer-guide/custom-layers/subclassed-layers.md')
           },
           {
+            name: 'Layer Extensions',
+            content: getDocUrl('developer-guide/custom-layers/layer-extensions.md')
+          },
+          {
             name: 'Primitive Layers',
             content: getDocUrl('developer-guide/custom-layers/primitive-layers.md')
           },
@@ -392,6 +448,10 @@ export const docPages = generatePath([
             content: getDocUrl('layers/geojson-layer.md')
           },
           {
+            name: 'HeatmapLayer',
+            content: getDocUrl('layers/heatmap-layer.md')
+          },
+          {
             name: 'IconLayer',
             content: getDocUrl('layers/icon-layer.md')
           },
@@ -425,6 +485,7 @@ export const docPages = generatePath([
           },
           {
             name: 'GPUGridLayer',
+            tag: 'advanced',
             content: getDocUrl('layers/gpu-grid-layer.md')
           },
           {
@@ -432,8 +493,9 @@ export const docPages = generatePath([
             content: getDocUrl('layers/great-circle-layer.md')
           },
           {
-            name: 'GridLayer',
-            content: getDocUrl('layers/grid-layer.md')
+            name: 'CPUGridLayer',
+            tag: 'advanced',
+            content: getDocUrl('layers/cpu-grid-layer.md')
           },
           {
             name: 'GridCellLayer',
@@ -450,6 +512,10 @@ export const docPages = generatePath([
           {
             name: 'H3HexagonLayer',
             content: getDocUrl('layers/h3-hexagon-layer.md')
+          },
+          {
+            name: 'GridLayer',
+            content: getDocUrl('layers/grid-layer.md')
           },
           {
             name: 'S2Layer',
@@ -470,6 +536,10 @@ export const docPages = generatePath([
           {
             name: 'TileLayer',
             content: getDocUrl('layers/tile-layer.md')
+          },
+          {
+            name: 'Tile3DLayer',
+            content: getDocUrl('layers/tile-3d-layer.md')
           },
           {
             name: 'TripsLayer',
@@ -532,16 +602,8 @@ export const docPages = generatePath([
             content: getDocUrl('api-reference/first-person-view.md')
           },
           {
-            name: 'ThirdPersonView',
-            content: getDocUrl('api-reference/third-person-view.md')
-          },
-          {
             name: 'OrthographicView',
             content: getDocUrl('api-reference/orthographic-view.md')
-          },
-          {
-            name: 'PerspectiveView',
-            content: getDocUrl('api-reference/perspective-view.md')
           },
           {
             name: 'OrbitView',
@@ -572,6 +634,10 @@ export const docPages = generatePath([
           {
             name: 'LightingEffect',
             content: getDocUrl('effects/lighting-effect.md')
+          },
+          {
+            name: 'PostProcessEffect',
+            content: getDocUrl('effects/post-process-effect.md')
           }
         ]
       },
@@ -606,6 +672,31 @@ export const docPages = generatePath([
     name: 'Submodule API Reference',
     children: [
       {
+        name: '@deck.gl/extensions',
+        children: [
+          {
+            name: 'Overview',
+            content: getDocUrl('api-reference/extensions/overview.md')
+          },
+          {
+            name: 'BrushingExtension',
+            content: getDocUrl('api-reference/extensions/brushing-extension.md')
+          },
+          {
+            name: 'DataFilterExtension',
+            content: getDocUrl('api-reference/extensions/data-filter-extension.md')
+          },
+          {
+            name: 'Fp64Extension',
+            content: getDocUrl('api-reference/extensions/fp64-extension.md')
+          },
+          {
+            name: 'PathStyleExtension',
+            content: getDocUrl('api-reference/extensions/path-style-extension.md')
+          }
+        ]
+      },
+      {
         name: '@deck.gl/google-maps',
         children: [
           {
@@ -628,10 +719,6 @@ export const docPages = generatePath([
           {
             name: 'JSONConverter',
             content: getDocUrl('api-reference/json/json-converter.md')
-          },
-          {
-            name: 'JSONLayer',
-            content: getDocUrl('api-reference/json/json-layer.md')
           }
         ]
       },

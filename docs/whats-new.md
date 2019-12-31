@@ -2,15 +2,312 @@
 
 This page contains highlights of each deck.gl release. Also check our [vis.gl blog](https://medium.com/vis-gl) for news about new releases and features in deck.gl.
 
+## deck.gl v8.0
+
+### Performance
+
+Performance is one of the biggest focus of this update. Layer updates (data change) is 1.5x the speed of the last release, and redraw (viewport change) is 2.5x.
+
+*Benchmark of using 1000 ScatterplotLayers on 2016 Macbook Pro, 2.8 GHz Intel Core i7, 16 GB memory, AMD Radeon R9 M370X 2 GB*
+
+|                   | v7.3  | v8.0  | Change |
+| ----------------- | ----- | ----- | ------ |
+| Initialize        | 298ms | 235ms | -21%   |
+| Update            | 112ms | 72ms  | -36%   |
+| Redraw (CPU Time) | 76ms  | 26ms  | -66%   |
+| Redraw (GPU Time) | 17ms  | 10ms  | -41%   |
+
+In addition to runtime performance, deck.gl also added a production mode to optimize bundle size. The v8.0 minified bundle of `@deck.gl/core` is 50kb lighter than that of v7.3.
+
+### Better Binary Data Support
+
+It is now possible to replace a layer's accessors with binary data attributes. This technique offers the maximum performance in terms of data throughput in applications where a lot of data is loaded and/or frequently updated:
+
+```js
+const data = new Float32Array([
+  0.7, 0.2, 0, 0, 0, 0,
+  0.8, 0.6, 0, 0, 5, 0,
+  0.3, 0.5, 0, 5, 5, 0,
+  0, 0.8, 0.6, 5, 10, 0,
+  0, 0.5, 0.7, 10, 10, 0
+]);
+
+new deck.ScatterplotLayer({
+  id: 'points',
+  data: {
+    length: 5,
+    attributes: {
+      getPosition: {value: data, size: 3, offset: 12, stride: 24},
+      getFillColor: {value: data, size: 3, offset: 0, stride: 24}
+    }
+  }
+  getRadius: 1
+})
+```
+
+This use case is discussed in detail in the [performance developer guide](/docs/developer-guide/performance.md#supply-attributes-directly).
+
+### GPU Data Filter in Aggregation Layers
+
+[DataFilterExtension](/docs/api-reference/extensions/data-filter-extension.md) now supports the following layers from `@deck.gl/aggregation-layers`:
+
+- `HeatMapLayer`
+- `GPUGridLayer`
+- `ScreenGridlayer` (GPU aggregation only)
+- `ContourLayer` (GPU aggregation only)
+- `GridLayer` (GPU aggregation only)
+
+### pydeck
+
+- pydeck now supports JupyterLab.
+- The Jupyter widget now allows users to click multiple objects in a visualization and pass them to the Python backend.
+- JavaScript errors are now surfaced in the Jupyter UI.
+- Support for non-Mercator visualizations.
+- The JSON parser has introduced syntactic identifiers in an effort to become more generic and robust. It is able to work with a wider range of data formats and layer types. See upgrade guide for details.
+
+### Other New Features and Improvements
+
+- Render to a frame buffer by specifying the `_framebuffer` prop of [Deck](/docs/api-reference/deck.md).
+- Pick a 3d surface point in the scene by passing `unproject3D: true` to `deck.pickObject` or `deck.pickMultipleObjects`.
+- [ArcLayer](/docs/layers/arc-layer.md) supports drawing arcs between two 3D positions.
+- [TextLayer](/docs/layers/text-layer.md) adds a new prop `backgroundColor`. Picking works when the cursor is over an empty pixel in the text.
+- [TextLayer](/docs/layers/text-layer.md) adds `maxWidth` and `wordBreak` props to support text wrapping.
+- [ScenegraphLayer](/docs/layers/scenegraph-layer.md) adds props `sizeMinPixels` and `sizeMaxPixels`.
+- 64-bit positions are now 3D instead of 2D. This improves render precision when using `OrbitView`.
+- `FirstPersonView` now supports pitch; controller works more intuitively; graduates from experimental status.
+- `FlyToInterpolator` now supports `duration: 'auto'`.
+
+
+## deck.gl v7.3
+
+Release Date: Sep xx, 2019
+
+<table style="border: 0;" align="center">
+  <tbody>
+    <tr>
+      <td>
+        <img style="max-height:200px" src="https://raw.github.com/uber-common/deck.gl-data/master/images/whats-new/tile-3d-layer.gif" />
+        <p><i>Tile3DLayer</i></p>
+      </td>
+      <td>
+        <img style="max-height:200px" src="https://raw.github.com/uber-common/deck.gl-data/master/images/whats-new/jupyter-integration.gif" />
+        <p><i>Jupyter Widget</i></p>
+      </td>
+      <td>
+        <img style="max-height:200px" src="https://raw.github.com/uber-common/deck.gl-data/master/images/whats-new/spring-transition.gif" />
+        <p><i>Spring Transition</i></p>
+      </td>
+    </tr>
+  </tbody>
+</table>
+
+
+### Tile3DLayer
+
+deck.gl has partnered with [Cesium](https://cesium.com/) to implement support for the OGC [3D Tiles specification](https://github.com/AnalyticalGraphicsInc/3d-tiles/tree/master/specification). This makes it possible to to render city-scale (billions of points/features) and country-scale (trillions of features) datasets in the browser.
+
+In this initial release, the layer has full support for point clouds and experimental support for glTF tiles. Try the [demo]() for yourself.
+
+### pydeck: deck.gl for Python and Jupyter Notebooks
+
+We have released a python module `pydeck` for Python developers to interact with deck.gl via a native Python API:
+
+```bash
+pip install pydeck
+```
+
+`pydeck` is also integrated with Jupyter Notebook, enabling you to interactively create deck.gl visualizations right in your notebooks. See [documentation](https://github.com/uber/deck.gl/blob/master/bindings/python/pydeck/README.md) for details.
+
+### Transition System Improvements
+
+- Generic prop transition: the layer `transitions` prop now supports many more props than just accessors! Any prop of type `number` or `array` can now also use the built-in transition system.
+- New transition type: spring-based transition support is added to the transition settings. See [documentation](/docs/api-reference/layer.md#transitions-object-optional) for details.
+
+### @deck.gl/json
+
+The `JSONConverter` class has been generalized and can now be used independently of deck.gl to "hydrate" JavaScript from JSON text specifications. This supports its use a foundation technology for providing non-JavaScript bindings such as `pydeck`. This has caused some breaking changes to this experimental module. For details and work-arounds see the upgrade guide.
+
+### Under the Hood
+
+We have introduced a new resource management system to luma.gl and deck.gl core. This significantly reduces the initial loading time if an app uses multiple layers of the same type.
+
+It is now easier to supply external buffers to layer attributes as deck.gl no longer requires them to match the default buffer type.
+
+For custom layer authors: the attribute system is simplified. One may now use `type: GL.DOUBLE` when adding an attribute to the `AttributeManager`. the attribute will automatically be mapped to two 32-bit shader attributes `<attrbName>` and `<attrbName>64xyLow`.
+
+### Auto Tooltip
+
+A new prop [getTooltip](/docs/api-reference/deck.md#gettooltip-function-optional) is added to the `Deck` class. By supplying this callback, an app may specify the content and styling of a built-in tooltip.
+
+### Other Features/Improvements
+
+- **OrbitController** now supports 360 degree rotation on both axis. Relax `minRotationX` and `maxRotationX` to use this feature.
+- **Customizable device pixel ratio**: `Deck`'s `useDevicePixels` prop now accepts a number as well as boolean values.
+- **SimpleMeshLayer** and **ScenegraphLayer** now respect the `opacity` prop.
+- **IconLayer** has added a new prop `alphaCutoff` for customizing picking behavior.
+- **HeatmapLayer** is out of `Experimental` phase and can now be rendered using `WebGL1` context. A new prop `colorDomain` added for custom domain specification.
+
+
+## deck.gl v7.2
+
+Release Date: Aug 10, 2019
+
+### Layer Extensions
+
+A new module [`@deck.gl/extensions`](/docs/api-reference/extensions/overview.md) has joined the deck.gl family.
+Layer extensions are bonus features that you can optionally add to the core deck.gl layers. As a start, this module offers the following extensions:
+
+- [BrushingExtension](/docs/api-reference/extensions/brushing-extension.md): GPU-based data brushing, see "examples" section of this website
+- [DataFilterExtension](/docs/api-reference/extensions/data-filter-extension.md): GPU-based data filtering, see "examples" section of this website
+- [Fp64Extension](/docs/api-reference/extensions/fp64-extension.md): See [upgrade guide](/docs/upgrade-guide.md) if you are using the deprecated `fp64` mode.
+
+For instructions on authoring your own layer extensions, visit [developer guide](/docs/developer-guide/custom-layers/layer-extensions.md).
+
+<table style="border: 0;" align="center">
+  <tbody>
+    <tr>
+      <td>
+        <img style="max-height:200px" src="https://raw.github.com/uber-common/deck.gl-data/master/images/whats-new/heatmap-layer.gif" />
+        <p><i>HeatmapLayer</i></p>
+      </td>
+      <td>
+        <img style="max-height:200px" src="https://raw.github.com/uber-common/deck.gl-data/master/images/whats-new/shadow-nyc.jpg" />
+        <p><i>GeoJsonLayer with shadow</i></p>
+      </td>
+      <td>
+        <img style="max-height:200px" src="https://raw.github.com/uber-common/deck.gl-data/master/images/whats-new/shadow-uk.jpg" />
+        <p><i>HexagonLayer with shadow</i></p>
+      </td>
+    </tr>
+  </tbody>
+</table>
+
+### HeatmapLayer
+
+The ` @deck.gl/aggregation-layers` module now offers `HeatmapLayer` as an experimental layer. It performs density distribution on the GPU to provide fast dynamic heatmaps. The layer currently only supports WebGL2-enabled browsers. A fallback solution for WebGL1 will be added later.
+
+### Shadows in LightingEffect
+
+As an experimental feature, the [LightingEffect](/docs/effects/lighting-effect.md) can now render shadows from up to two directional light sources. To enable shadows, set `_shadow: true` when constructing a
+[DirectionalLight](/docs/api-reference/lights/directional-light.md) or [SunLight](/docs/api-reference/lights/sun-light.md).
+
+### New Ways to Supply and Update Layer Data
+
+#### Streaming Data Support
+
+Layers now have built-in streaming support. The `data` prop now accepts an [async iterable](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Symbol/asyncIterator) object. As new baches of data are resolved, the layer is updated incrementally. This eliminates the need to manually merge chunks of data or manage multiple layer instances.
+See details in the [data prop](/docs/api-reference/layer.md#basic-properties) documentation and the updated [performance optimization](/docs/developer-guide/performance.md) examples.
+
+#### Partial Data Update
+
+By default, when the `data` prop value of a layer changes shallowly, all of its attributes are recalculated and re-uploaded to the GPU. You may now compare the old and new data arrays and only update the range of elements that have actually changed. This can lead to significant performance improvement if a few rows in a large data table need to change frequently. See the [_dataDiff prop](/docs/api-reference/layer.md#data-properties) documentation.
+
+#### Using External Buffers
+
+It is now easier to build attributes as typed arrays outside of a layer, e.g. in a web worker or on the server. See the "Supplying attributes directly" section in [performance optimization](/docs/developer-guide/performance.md).
+
+### Other Layer Features and Optimizations
+
+- [BitmapLayer](/docs/layers/bitmap-layer.md)'s `image` prop now accepts a `HTMLVideoElement`.
+- [TextLayer](/docs/layers/text-layer.md) now supports line breaks in the text string. A new prop `lineHeight` is added.
+- Layer matching performance is improved. This affects applications with a large number of layers.
+- [HeatmapLayer](/docs/layers/heatmap-layer.md) now supports WebGL1.
+
+
 ## deck.gl v7.1
 
 Release Date: 2019
 
-### ScenegraphLayer
+### Post-processing Effects
+
+A new [PostProcessEffect](/docs/effects/post-process-effect.md) class, working with ` @luma.gl/effects` module,  offers screen-space post-processing effects such as blur, noise, halftone, ink, etc.
+
+<table style="border: 0;" align="center">
+  <tbody>
+    <tr>
+      <td>
+        <img style="max-height:240px" src="https://raw.github.com/uber-common/deck.gl-data/master/images/samples/post-processing/noise.jpg" />
+        <p><i>noise effect</i></p>
+      </td>
+      <td>
+        <img style="max-height:240px" src="https://raw.github.com/uber-common/deck.gl-data/master/images/samples/post-processing/colorhalftone.gif" />
+        <p><i>colorHalftone effect</i></p>
+      </td>
+    </tr>
+    <tr>
+      <td>
+        <img style="max-height:240px" src="https://raw.github.com/uber-common/deck.gl-data/master/images/samples/post-processing/tiltshift.jpg" />
+        <p><i>tiltShift effect</i></p>
+      </td>
+      <td>
+        <img style="max-height:240px" src="https://raw.github.com/uber-common/deck.gl-data/master/images/samples/post-processing/zoomblur.jpg" />
+        <p><i>zoomBlur effect</i></p>
+      </td>
+    </tr>
+  </tbody>
+</table>
+
+### Layer Enhancements
+
+#### GridLayer
+
+`GridLayer` is enhanced to support GPU Aggregation. By default GPU Aggregation is disabled, and can be enabled using `gpuAggregation` prop. For more details check [GridLayer](/docs/layers/grid-layer.md). Two new layers [GPUGridLayer](/docs/layers/gpu-grid-layer.md) and [CPUGridLayer](/docs/layers/cpu-grid-layer.md) are also offered, which perform aggregation on CPU and GPU respectively.
+
+The following table compares the performance between CPU and GPU aggregations using random data points:
+
+| #points | CPU #iternations/sec | GPU #iterations/sec | Notes |
+| ---- | --- | --- | --- |
+| 25K | 535 | 359 | GPU is <b style="color:red">33%</b> slower |
+| 100K | 119 | 437 | GPU is <b style="color:green">267%</b> faster |
+| 1M | 12.7 | 158 | GPU is <b style="color:green">1144%</b> faster |
+
+*Numbers are collected on a 2018 15-inch Macbook Pro (CPU: 2.6 GHz Intel Core i7 and GPU: Radeon Pro 560X 4 GB)*
+
+#### ColumnLayer & H3HexagonLayer
+
+- Now support drawing outline. In 3D mode (extruded), set `wireframe: true`. In 2D mode, enable stroke by setting `stroked: true` with `getLineWidth`, `getLineColor` among other stroke options.
+- Improved the performance of `H3HexagonLayer`.
+
+#### PathLayer
+
+- Added `billboard` prop for screen space extrusion when rendering 3D paths
+- Improved precision of joint calculation
+
+#### TripsLayer
+
+- Now support 3D paths by adding a `getTimestamps` accessor. See layer documentation for details.
+
+#### ScenegraphLayer
 
 - Added `getScene` and `getAnimator` to allow more flexibility when loading models.
 - Experimental `_lighting` property for PBR lighting.
 - Experimental `_imageBasedLightingEnvironment` property for image-based lighting.
+
+
+### 64-bit Precision in Info-vis
+
+`OrthographicView` and `OrbitView` now also support 64-bit projection, with no extra code changes required. This greatly improves the visual quality when rendering very large and/or dense graphs.
+
+### Use react-map-gl Components with DeckGL
+
+For React users, it is now easy to use [react-map-gl](http://uber.github.io/react-map-gl/#/Examples/markers-popups) components with DeckGL, including DOM-based [marker](https://uber.github.io/react-map-gl/#/Documentation/api-reference/marker), [popup](https://uber.github.io/react-map-gl/#/Documentation/api-reference/popup), [navigation control](https://uber.github.io/react-map-gl/#/Documentation/api-reference/navigation-control), [fullscreen control](https://uber.github.io/react-map-gl/#/Documentation/api-reference/fullscreen-control) and [geolocate control](https://uber.github.io/react-map-gl/#/Documentation/api-reference/geolocate-control). This can be done by supplying the `ContextProvider` prop on `DeckGL`:
+
+```jsx
+/// Example using react-map-gl controls with deck.gl
+import DeckGL from '@deck.gl/react';
+import {_MapContext as MapContext, NavigationControl} from 'react-map-gl';
+
+<DeckGL ... ContextProvider={MapContext.Provider}>
+  <div style={{margin: 10, position: 'absolute', zIndex: 1}}>
+    <NavigationControl />
+  </div>
+</DeckGL>
+```
+
+### Performance Metrics
+
+- Added a `metrics` property to `Deck` instances that tracks performance statistics like fps, CPU/GPU render time and memory usage. See [Deck](/docs/api-reference/deck.md) class documention for details.
+
 
 ## deck.gl v7.0
 
@@ -22,43 +319,43 @@ Release Date: April 19, 2019
   <tbody>
     <tr>
       <td>
-        <img height=200 src="https://raw.github.com/uber-common/deck.gl-data/master/images/whats-new/bitmap-layer.png" />
+        <img style="max-height:200px" src="https://raw.github.com/uber-common/deck.gl-data/master/images/whats-new/bitmap-layer.png" />
         <p><i>BitmapLayer</i></p>
       </td>
       <td>
-        <img height=200 src="https://raw.github.com/uber-common/deck.gl-data/master/images/whats-new/column-layer.png" />
+        <img style="max-height:200px" src="https://raw.github.com/uber-common/deck.gl-data/master/images/whats-new/column-layer.png" />
         <p><i>ColumnLayer</i></p>
       </td>
       <td>
-        <img height=200 src="https://raw.github.com/uber-common/deck.gl-data/master/images/whats-new/tile-layer.gif" />
+        <img style="max-height:200px" src="https://raw.github.com/uber-common/deck.gl-data/master/images/whats-new/tile-layer.gif" />
         <p><i>TileLayer</i></p>
       </td>
     </tr>
     <tr>
       <td>
-        <img height=200 src="https://raw.github.com/uber-common/deck.gl-data/master/images/whats-new/s2-layer.png" />
+        <img style="max-height:200px" src="https://raw.github.com/uber-common/deck.gl-data/master/images/whats-new/s2-layer.png" />
         <p><i>S2Layer</i></p>
       </td>
       <td>
-        <img height=200 src="https://raw.github.com/uber-common/deck.gl-data/master/images/whats-new/h3-layer.png" />
+        <img style="max-height:200px" src="https://raw.github.com/uber-common/deck.gl-data/master/images/whats-new/h3-layer.png" />
         <p><i>H3HexagonLayer</i></p>
       </td>
       <td>
-        <img height=200 src="https://raw.github.com/uber-common/deck.gl-data/master/images/whats-new/h3-cluster-layer.png" />
+        <img style="max-height:200px" src="https://raw.github.com/uber-common/deck.gl-data/master/images/whats-new/h3-cluster-layer.png" />
         <p><i>H3ClusterLayer</i></p>
       </td>
     </tr>
     <tr>
       <td>
-        <img height=200 src="https://raw.github.com/uber-common/deck.gl-data/master/images/whats-new/trips-layer.gif" />
+        <img style="max-height:200px" src="https://raw.github.com/uber-common/deck.gl-data/master/images/whats-new/trips-layer.gif" />
         <p><i>TripsLayer</i></p>
       </td>
       <td>
-        <img height=200 src="https://raw.github.com/uber-common/deck.gl-data/master/images/whats-new/mesh-layer.gif" />
+        <img style="max-height:200px" src="https://raw.github.com/uber-common/deck.gl-data/master/images/whats-new/mesh-layer.gif" />
         <p><i>ScenegraphLayer</i></p>
       </td>
       <td>
-        <img height=200 src="https://raw.github.com/uber-common/deck.gl-data/master/images/whats-new/great-circle-layer.png" />
+        <img style="max-height:200px" src="https://raw.github.com/uber-common/deck.gl-data/master/images/whats-new/great-circle-layer.png" />
         <p><i>GreatCircleLayer</i></p>
       </td>
     </tr>
@@ -112,21 +409,21 @@ We are releasing [loaders.gl](https://uber-web.github.io/loaders.gl/) as a major
   <tbody>
     <tr>
       <td>
-        <img height=200 src="https://raw.github.com/uber-common/deck.gl-data/master/images/whats-new/ambient-light.gif" />
+        <img style="max-height:200px" src="https://raw.github.com/uber-common/deck.gl-data/master/images/whats-new/ambient-light.gif" />
         <p><i>Ambient Light</i></p>
       </td>
       <td>
-        <img height=200 src="https://raw.github.com/uber-common/deck.gl-data/master/images/whats-new/point-light.gif" />
+        <img style="max-height:200px" src="https://raw.github.com/uber-common/deck.gl-data/master/images/whats-new/point-light.gif" />
         <p><i>Point Light</i></p>
       </td>
     </tr>
     <tr>
       <td>
-        <img height=200 src="https://raw.github.com/uber-common/deck.gl-data/master/images/whats-new/directional-light.gif" />
+        <img style="max-height:200px" src="https://raw.github.com/uber-common/deck.gl-data/master/images/whats-new/directional-light.gif" />
         <p><i>Directional Light</i></p>
       </td>
       <td>
-        <img height=200 src="https://raw.github.com/uber-common/deck.gl-data/master/images/whats-new/camera-light.gif" />
+        <img style="max-height:200px" src="https://raw.github.com/uber-common/deck.gl-data/master/images/whats-new/camera-light.gif" />
         <p><i>Camera Light</i></p>
       </td>
     </tr>
@@ -163,15 +460,15 @@ Release Date: Jan 29, 2019
   <tbody>
     <tr>
       <td>
-        <img height=200 src="https://raw.github.com/uber-common/deck.gl-data/master/images/whats-new/deck64-sdf.gif" />
+        <img style="max-height:200px" src="https://raw.github.com/uber-common/deck.gl-data/master/images/whats-new/deck64-sdf.gif" />
         <p><i>SDF font in TextLayer</i></p>
       </td>
       <td>
-        <img height=200 src="https://raw.github.com/uber-common/deck.gl-data/master/images/whats-new/deck64-scatterplot.jpg" />
+        <img style="max-height:200px" src="https://raw.github.com/uber-common/deck.gl-data/master/images/whats-new/deck64-scatterplot.jpg" />
         <p><i>Stroke and fill in ScatterplotLayer</i></p>
       </td>
       <td>
-        <img height=200 src="https://raw.github.com/uber-common/deck.gl-data/master/images/whats-new/deck64-isoband.jpg" />
+        <img style="max-height:200px" src="https://raw.github.com/uber-common/deck.gl-data/master/images/whats-new/deck64-isoband.jpg" />
         <p><i>Isoband in ContourLayer</i></p>
       </td>
     </tr>
@@ -221,11 +518,11 @@ Release Date: Oct 15, 2018
   <tbody>
     <tr>
       <td>
-        <img height=200 src="https://raw.github.com/uber-common/deck.gl-data/master/images/whats-new/new-projection-mode.gif" />
+        <img style="max-height:200px" src="https://raw.github.com/uber-common/deck.gl-data/master/images/whats-new/new-projection-mode.gif" />
         <p><i>32-bit High-Precision Projection</i></p>
       </td>
       <td>
-        <img height=200 src="https://raw.github.com/uber-common/deck.gl-data/master/images/whats-new/mapbox-layers.jpg" />
+        <img style="max-height:200px" src="https://raw.github.com/uber-common/deck.gl-data/master/images/whats-new/mapbox-layers.jpg" />
         <p><i>Mixing Mapbox and deck.gl Layers</i></p>
       </td>
     </tr>
@@ -253,15 +550,15 @@ Release date: Sep 7, 2018
   <tbody>
     <tr>
       <td>
-        <img height=200 src="https://raw.github.com/uber-common/deck.gl-data/master/images/whats-new/json-layers-thumb.gif" />
+        <img style="max-height:200px" src="https://raw.github.com/uber-common/deck.gl-data/master/images/whats-new/json-layers-thumb.gif" />
         <p><i>JSON API</i></p>
       </td>
       <td>
-        <img height=200 src="https://raw.github.com/uber-common/deck.gl-data/master/images/whats-new/minimap-thumb.gif" />
+        <img style="max-height:200px" src="https://raw.github.com/uber-common/deck.gl-data/master/images/whats-new/minimap-thumb.gif" />
         <p><i>Enhanced Multi-View API</i></p>
       </td>
       <td>
-        <img height=200 src="https://raw.github.com/uber-common/deck.gl-data/master/images/whats-new/contour-layer-cell-resize.gif" />
+        <img style="max-height:200px" src="https://raw.github.com/uber-common/deck.gl-data/master/images/whats-new/contour-layer-cell-resize.gif" />
         <p><i>ContourLayer</i></p>
       </td>
     </tr>
@@ -281,7 +578,7 @@ The projection algorithm used for geospatial coordinates (layers with `coordinat
 
 ### JSON API (Experimental)
 
-A new experimental module `@deck.gl/json` provides a set of classes that allows deck.gl layers and views to be specified using JSON-formatted text files. To facilitate experimentation, a JSON layer browser is available on [http://deck.gl/json](http://deck.gl/json).
+A new experimental module `@deck.gl/json` provides a set of classes that allows deck.gl layers and views to be specified using JSON-formatted text files. To facilitate experimentation, a JSON layer browser is available on [http://deck.gl/playground](http://deck.gl/playground).
 
 
 ### Enhanced Multiview Support
@@ -312,15 +609,15 @@ Release date: July 18, 2018
   <tbody>
     <tr>
       <td>
-        <img height=200 src="https://raw.github.com/uber-common/deck.gl-data/master/images/attribute-transition.gif" />
+        <img style="max-height:200px" src="https://raw.github.com/uber-common/deck.gl-data/master/images/attribute-transition.gif" />
         <p><i>GeoJson Transition</i></p>
       </td>
       <td>
-        <img height=200 src="https://raw.github.com/uber-common/deck.gl-data/master/images/whats-new/viewstateTransitionsFlyTo.gif" />
+        <img style="max-height:200px" src="https://raw.github.com/uber-common/deck.gl-data/master/images/whats-new/viewstateTransitionsFlyTo.gif" />
         <p><i>ViewState flyTo Transitions</i></p>
       </td>
       <td>
-        <img height=200 src="https://raw.github.com/uber-common/deck.gl-data/master/images/whats-new/GPUAcceleratedScreenGridAggregation.gif" />
+        <img style="max-height:200px" src="https://raw.github.com/uber-common/deck.gl-data/master/images/whats-new/GPUAcceleratedScreenGridAggregation.gif" />
         <p><i>GPU Accelerated ScreenGrid Layer</i></p>
       </td>
     </tr>

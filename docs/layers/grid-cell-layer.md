@@ -3,13 +3,12 @@
 
 <p class="badges">
   <img src="https://img.shields.io/badge/@deck.gl/layers-lightgrey.svg?style=flat-square" alt="@deck.gl/layers" />
-  <img src="https://img.shields.io/badge/fp64-yes-blue.svg?style=flat-square" alt="64-bit" />
   <img src="https://img.shields.io/badge/lighting-yes-blue.svg?style=flat-square" alt="lighting" />
 </p>
 
 # GridCellLayer
 
-> This is the primitive layer rendered by [GridLayer](/docs/layers/grid-layer.md) after aggregation. Unlike the GridLayer, it renders one column for each data object.
+> This is the primitive layer rendered by [CPUGridLayer](/docs/layers/cpu-grid-layer.md) after aggregation. Unlike the CPUGridLayer, it renders one column for each data object.
 
 The GridCellLayer can render a grid-based heatmap.
 It is a variation of the [ColumnLayer](/docs/layers/column-layer.md).
@@ -37,7 +36,7 @@ const App = ({data, viewport}) => {
     cellSize: 200,
     elevationScale: 5000,
     getPosition: d => d.centroid,
-    getColor: d => [48, 128, d.value * 255, 255],
+    getFillColor: d => [48, 128, d.value * 255, 255],
     getElevation: d => d.value,
     onHover: ({object, x, y}) => {
       const tooltip = `height: ${object.value * 5000}m`;
@@ -70,10 +69,10 @@ new GridCellLayer({});
 To use pre-bundled scripts:
 
 ```html
-<script src="https://unpkg.com/@deck.gl@~7.0.0/dist.min.js"></script>
+<script src="https://unpkg.com/deck.gl@^8.0.0/dist.min.js"></script>
 <!-- or -->
-<script src="https://unpkg.com/@deck.gl/core@~7.0.0/dist.min.js"></script>
-<script src="https://unpkg.com/@deck.gl/layers@~7.0.0/dist.min.js"></script>
+<script src="https://unpkg.com/@deck.gl/core@^8.0.0/dist.min.js"></script>
+<script src="https://unpkg.com/@deck.gl/layers@^8.0.0/dist.min.js"></script>
 ```
 
 ```js
@@ -87,20 +86,20 @@ Inherits from all [Base Layer](/docs/api-reference/layer.md) properties.
 
 ### Render Options
 
-##### `cellSize` (Number, optional)
+##### `cellSize` (Number, optional) ![transition-enabled](https://img.shields.io/badge/transition-enabled-green.svg?style=flat-square")
 
 * Default: `1000`
 
 Size of each grid cell in meters
 
-##### `coverage` (Number, optional)
+##### `coverage` (Number, optional) ![transition-enabled](https://img.shields.io/badge/transition-enabled-green.svg?style=flat-square")
 
 * Default: `1`
 
 Cell size scale factor. The size of cell is calculated by
 `cellSize * coverage`.
 
-##### `elevationScale` (Number, optional)
+##### `elevationScale` (Number, optional) ![transition-enabled](https://img.shields.io/badge/transition-enabled-green.svg?style=flat-square")
 
 * Default: `1`
 
@@ -112,20 +111,14 @@ to scale all cell elevations without updating the data.
 
 * Default: `true`
 
-Whether to enable grid elevation. If se to false, all grid will be flat.
-
-##### `fp64` (Boolean, optional)
-
-* Default: `false`
-
-Whether the layer should be rendered in high-precision 64-bit mode. Note that since deck.gl v6.1, the default 32-bit projection uses a hybrid mode that matches 64-bit precision with significantly better performance.
+Whether to enable grid elevation. If set to false, all grid will be flat.
 
 ##### `material` (Object, optional)
 
-* Default: `new PhongMaterial()`
+* Default: `true`
 
 This is an object that contains material props for [lighting effect](/docs/effects/lighting-effect.md) applied on extruded polygons.
-Check [PhongMaterial](https://github.com/uber/luma.gl/tree/7.0-release/docs/api-reference/core/materials/phong-material.md) for more details.
+Check [the lighting guide](/docs/developer-guide/using-lighting.md#constructing-a-material-instance) for configurable settings.
 
 ### Data Accessors
 
@@ -158,4 +151,3 @@ The elevation of each cell in meters.
 ## Source
 
 [modules/layers/src/grid-cell-layer](https://github.com/uber/deck.gl/tree/master/modules/layers/src/column-layer/grid-cell-layer.js)
-

@@ -4,9 +4,9 @@
 
 A deck.gl `Viewport` is essentially a geospatially enabled camera, and combines a number of responsibilities, which can project and unproject 3D coordinates to the screen.
 
-`Viewport` classes are focused on mathematical operations such as coordinate projection/unprojection, and calculation of `view` and `projection` matrices and other uniforms needed by the WebGL vertex shaders. The basic `Viewport` class is a generic geospatially enabled version of the typical 3D "camera" class you would find in most 3D/WebGL/OpenGL library. 
+`Viewport` classes are focused on mathematical operations such as coordinate projection/unprojection, and calculation of `view` and `projection` matrices and other uniforms needed by the WebGL vertex shaders. The basic `Viewport` class is a generic geospatially enabled version of the typical 3D "camera" class you would find in most 3D/WebGL/OpenGL library.
 
-While the `Viewport` class can certainly be used directly if you need and are able to calculate your own projection matrices, you typically do not directly create `Viewport` instances. Instead, `Viewport` classes are created using the View](/docs/api-reference/view.md) class descriptors and the current `viewState`.
+While the `Viewport` class can certainly be used directly if you need and are able to calculate your own projection matrices, you typically do not directly create `Viewport` instances. Instead, `Viewport` classes are created using the [View](/docs/api-reference/view.md) class descriptors and the current `viewState`.
 
 ## Overview of Viewport Classes
 
@@ -56,8 +56,8 @@ If `projectionMatrix` is not supplied, an attempt is made to build from the rema
 
 * `fovy` (`Number`, optional) - Field of view covered by camera, in the perspective case. In degrees. Default `75`.
 * `aspect` (`Number`, optional) - Aspect ratio. Defaults to the Viewport's `width/height` ratio.
-* `near` (`Number`, optional) - Distance of near clipping plane. Default `0.1`.
-* `far` (`Number`, optional) - Distance of far clipping plane. Default `1000`.
+* `near` (`Number`, optional) - Distance of near clipping plane. Default `0.1`. (Note that in geospatial viewports, this actual distance used is scaled by the height of the screen).
+* `far` (`Number`, optional) - Distance of far clipping plane. Default `1000`. (Note that in geospatial viewports, this actual distance used is scaled by the height of the screen).
 * `orthographic` (`Boolean`, optional) - whether to create an orthographic or perspective projection matrix. Default `false` (perspective projection).
 * `orthographicFocalDistance` (`Number`, optional) - Used by orthographic projections only. The distance at which the field-of-view frustum is sampled to extract the extents of the view box. Default `1`.
 
@@ -122,7 +122,7 @@ Note:
 
 ##### `projectPosition`
 
-Projects latitude, longitude (and altitude) to coordinates in the WebMercator world.
+Projects latitude, longitude (and altitude) to coordinates in the [common space](/docs/shader-modules/project.md).
 
 Parameters:
 
@@ -135,7 +135,7 @@ Returns:
 
 ##### `unprojectPosition`
 
-Projects a coordinate from the WebMercator world to latitude, longitude and altitude.
+Projects a coordinate from the [common space](/docs/shader-modules/project.md) to latitude, longitude and altitude.
 
 Parameters:
 
@@ -144,6 +144,16 @@ Parameters:
 Returns:
 
 * `[longitude, latitude, altitude]`
+
+
+##### `getFrustumPlanes`
+
+Extract view frustum planes of the current camera. Each plane is defined by its normal `normal` and distance from
+the origin `distance` (such that point `x` is on the plane if `dot(normal, x) === distance`) in the [common space](/docs/shader-modules/project.md).
+
+Returns:
+
+* `{near: {normal, distance}, far: {normal, distance}, left: {normal, distance}, right: {normal, distance}, top: {normal, distance}, bottom: {normal, distance}}`
 
 
 ## Remarks

@@ -31,6 +31,7 @@ import * as meshLayers from '@deck.gl/mesh-layers';
 
 import * as core from '@deck.gl/core';
 import * as json from '@deck.gl/json';
+import * as googleMaps from '@deck.gl/google-maps';
 import * as mapbox from '@deck.gl/mapbox';
 import * as react from '@deck.gl/react';
 import * as testUtils from '@deck.gl/test-utils';
@@ -47,9 +48,7 @@ test('Top-level imports', t0 => {
 
   test('import "deck.gl"', t => {
     t.notOk(hasEmptyExports(deck), 'No empty top-level export in deck.gl');
-    t.notOk(hasEmptyExports(deck.experimental), 'No empty experimental export in deck.gl');
     t.notOk(hasEmptyExports(core), 'No empty top-level export in @deck.gl/core');
-    t.notOk(hasEmptyExports(core.experimental), 'No empty experimental export in @deck.gl/core');
     t.end();
   });
 
@@ -66,6 +65,7 @@ test('Top-level imports', t0 => {
 
   test('import utilities', t => {
     t.notOk(hasEmptyExports(json), 'No empty top-level export in @deck.gl/json');
+    t.notOk(hasEmptyExports(googleMaps), 'No empty top-level export in @deck.gl/google-maps');
     t.notOk(hasEmptyExports(mapbox), 'No empty top-level export in @deck.gl/mapbox');
     t.notOk(hasEmptyExports(react), 'No empty top-level export in @deck.gl/react');
     t.notOk(hasEmptyExports(testUtils), 'No empty top-level export in @deck.gl/test-utils');
@@ -80,8 +80,11 @@ test('Top-level imports', t0 => {
     t.ok(deck.LineLayer, 'LineLayer symbol imported');
 
     t.ok(Number.isFinite(deck.COORDINATE_SYSTEM.LNGLAT), 'COORDINATE_SYSTEM.LNGLAT imported');
-    t.ok(Number.isFinite(deck.COORDINATE_SYSTEM.METERS), 'COORDINATE_SYSTEM.METERS imported');
-    t.ok(Number.isFinite(deck.COORDINATE_SYSTEM.IDENTITY), 'COORDINATE_SYSTEM.IDENTITY imported');
+    t.ok(
+      Number.isFinite(deck.COORDINATE_SYSTEM.METER_OFFSETS),
+      'COORDINATE_SYSTEM.METERS imported'
+    );
+    t.ok(Number.isFinite(deck.COORDINATE_SYSTEM.CARTESIAN), 'COORDINATE_SYSTEM.CARTESIAN imported');
     t.end();
   });
 
@@ -91,4 +94,34 @@ test('Top-level imports', t0 => {
   });
 
   t0.end();
+});
+
+test('deck.gl re-exports', t => {
+  const findMissingExports = (source, target) => {
+    const missingExports = [];
+    for (const key in source) {
+      // Exclude experimental exports
+      if (key[0] !== '_' && key !== 'experimental' && target[key] !== source[key]) {
+        missingExports.push(key);
+      }
+    }
+    return missingExports.length ? missingExports : null;
+  };
+
+  t.notOk(findMissingExports(core, deck), 'deck.gl re-exports everything from @deck.gl/core');
+  t.notOk(findMissingExports(layers, deck), 'deck.gl re-exports everything from @deck.gl/layers');
+  t.notOk(
+    findMissingExports(aggregationLayers, deck),
+    'deck.gl re-exports everything from @deck.gl/aggregation-layers'
+  );
+  t.notOk(
+    findMissingExports(geoLayers, deck),
+    'deck.gl re-exports everything from @deck.gl/geo-layers'
+  );
+  t.notOk(
+    findMissingExports(meshLayers, deck),
+    'deck.gl re-exports everything from @deck.gl/mesh-layers'
+  );
+
+  t.end();
 });

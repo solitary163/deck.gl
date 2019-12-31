@@ -1,10 +1,272 @@
 # Upgrade Guide
 
+## Upgrading from deck.gl v7.x to v8.0
+
+### Breaking Changes
+
+##### Defaults
+
+- The `opacity` prop of all layers is now default to `1` (used to be `0.8`).
+- [`SimpleMeshLayer`](/docs/layers/simple-mesh-layer.md) and [`ScenegraphLayer`](/docs/layers/scenegraph-layer.md): `modelMatrix` will be composed to instance transformation matrix (derived from  layer props `getOrientation`, `getScale`, `getTranslation` and `getTransformMatrix`) under `CARTESIAN` and `METER_OFFSETS` [coordinates](/docs/developer-guide/coordinate-systems.md).
+
+##### Removed
+
+- `ArcLayer` props
+  + `getStrokeWidth`: use `getWidth`
+- `LineLayer` props
+  + `getStrokeWidth`: use `getWidth`
+- `PathLayer` props
+  + `getDashArray`: use [PathStyleExtension](/docs/api-reference/extensions/path-style-extension.md)
+- `PolygonLayer` and `GeoJsonLayer` props
+  + `getLineDashArray`: use [PathStyleExtension](/docs/api-reference/extensions/path-style-extension.md)
+- `H3HexagonLayer` props
+  + `getColor`: use `getFillColor` and `getLineColor`
+- `Tile3DLayer` props:
+  + `onTileLoadFail`: use `onTileError`
+- `TileLayer` props:
+  + `onViewportLoaded`: use `onViewportLoad`  
+- `project` shader module
+  + `project_scale`: use `project_size`
+  + `project_to_clipspace`: use `project_position_to_clipspace`
+  + `project_pixel_to_clipspace`: use `project_pixel_size_to_clipspace`
+- `WebMercatorViewport` class
+  + `getLocationAtPoint`: use `getMapCenterByLngLatPosition`
+  + `lngLatDeltaToMeters`
+  + `metersToLngLatDelta`
+- `Layer` class
+  + `setLayerNeedsUpdate`: use `setNeedsUpdate`
+  + `setUniforms`: use `model.setUniforms`
+  + `use64bitProjection`
+  + `projectFlat`: use `projectPosition`
+- `PerspectiveView` class - use `FirstPersonView`
+- `ThirdPersonView` class - use `MapView` (geospatial) or `OrbitView` (info-vis)
+- `COORDINATE_SYSTEM` enum
+  + `LNGLAT_DEPRECATED`: use `LNGLAT`
+  + `METERS`: use `METER_OFFSETS`
+
+
+##### React
+
+- `DeckGL` no longer injects its children with view props (`width`, `height`, `viewState` etc.). If your custom component needs these props, consider using the [ContextProvider](/docs/api-reference/react/deckgl.md#react-context) or a render callback:
+
+  ```jsx
+  <DeckGL>
+    {({width, height, viewState}) => (...)}
+  </DeckGL>
+  ```
+
+- The children of `DeckGL` are now placed above the canvas by default (except the react-map-gl base map). Wrap them in e.g. `<div style={{zIndex: -1}}>` if they are intended to be placed behind the canvas.
+
+##### Debugging
+
+deck.gl now removes most logging when bundling under `NODE_ENV=production`.
+
+
+##### Standalone bundle
+
+The pre-bundled version, a.k.a. the [scripting API](/docs/get-started/using-standalone.md#using-the-scripting-api) has been aligned with the interface of the core [Deck](/docs/api-reference/deck.md) class.
+
+- Top-level view state props such as `longitude`, `latitude`, `zoom` are no longer supported. To specify the default view state, use `initialViewState`.
+- `controller` is no longer on by default, use `controller: true`.
+
+
+##### Textures
+
+In older versions of deck, we used to set `UNPACK_FLIP_Y_WEBGL` by default when creating textures from images. This is removed in v8.0 to better align with [WebGL best practice](https://github.com/KhronosGroup/WebGL/issues/2577). As a result, the texCoords in the shaders of `BitmapLayer`, `IconLayer` and `TextLayer` are y-flipped. This only affects users who extend these layers.
+
+Users of `SimpleMeshLayer` with texture will need to flip their texture image vertically.
+
+The change has allowed us to support loading textures from `ImageBitmap`, in use cases such as rendering to `OffscreenCanvas` on a web worker. 
+
+##### projection system
+
+- The [common space](/docs/shader-module/project.md) is no longer scaled to the current zoom level. This is part of an effort to make the geometry calculation more consistent and predictable. While one old common unit is equivalent to 1 screen pixel at the viewport center, one new common unit is equivalent to `viewport.scale` pixels at the viewport center.
+- `viewport.distanceScales` keys are renamed:
+  + `pixelsPerMeter` -> `unitsPerMeter`
+  + `metersPerPixel` -> `metersPerUnit`
+- Low part of a `DOUBLE` attribute is renamed from `*64xyLow` to `*64Low` and uses the same size as the high part. This mainly affect position attributes, e.g. all `vec2 positions64xyLow` and `vec2 instancePositions64xyLow` are now `vec3 positions64Low` and `vec3 instancePositions64Low`.
+  + `project`: `vec3 project_position(vec3 position, vec2 position64xyLow)` is now `vec3 project_position(vec3 position, vec3 position64Low)`.
+  + `project`: `vec4 project_position(vec4 position, vec2 position64xyLow)` is now `vec4 project_position(vec4 position, vec3 position64Low)`.
+  + `project32` and `project64`: `vec4 project_position_to_clipspace(vec3 position, vec2 position64xyLow, vec3 offset)` is now `vec4 project_position_to_clipspace(vec3 position, vec3 position64Low, vec3 offset)`.
+- The shader module [project64](/docs/shader-modules/project64.md) is no longer included in `@deck.gl/core` and `deck.gl`. You can still import it from `@deck.gl/extensions`.
+
+##### Shader modules
+
+This change affects custom layers. deck.gl is no longer registering shaders by default. This means any `modules` array defined in `layer.getShaders()` or `new Model()` must now use the full shader module objects, instead of just their names. All supported shader modules can be imported from `@deck.gl/core`.
+
+```js
+/// OLD
+new Model({
+  // ...
+  modules: ['picking', 'project32', 'gouraud-lighting']
+});
+```
+
+Should now become
+
+```js
+import {picking, project32, gouraudLighting} from '@deck.gl/core';
+/// NEW
+new Model({
+  // ...
+  modules: [picking, project32, gouraudLighting]
+});
+```
+
+##### Multi-view state handling
+
+We have fixed a bug when using `initialViewState` with multiple views. In the past, the state change in one view is unintendedly propagated to all views. As a result of this fix, multiple views (e.g. mini map) are no longer synchronized by default. To synchronize them, define the views with an explicit `viewState.id`:
+
+```js
+new Deck({
+  // ...
+  views: [
+    new MapView({id: 'main'}),
+    new MapView({id: 'minimap', controller: false, viewState: {id: 'main', pitch: 0, zoom: 10}})
+  ]
+})
+```
+
+See [View class](/docs/api-reference/view.md) documentation for details.
+
+
+## Upgrading from deck.gl v7.2 to v7.3
+
+#### Core
+
+- `layer.setLayerNeedsUpdate` is renamed to `layer.setNeedsUpdate()` and the old name will be removed in the next major release.
+- Previously deprecated `Layer` class method, `screenToDevicePixels`, is removed. Use luma.gl [utility methods](https://luma.gl/#/documentation/api-reference/webgl-2-classes/device-pixels) instead.
+
+#### Layers
+
+- `ScreenGridLayer`: support is now limited to browsers that implement either WebGL2 or the `OES_texture_float` extension. [coverage stats](https://webglstats.com/webgl/extension/OES_texture_float)
+- Some shader attributes are renamed for consistency:
+
+| Layer | Old | New |
+| ----- | --- | --- |
+| `LineLayer` | `instanceSourceTargetPositions64xyLow.xy` | `instanceSourcePositions64xyLow` |
+| | `instanceSourceTargetPositions64xyLow.zw` | `instanceTargetPositions64xyLow` |
+| `PathLayer` | `instanceLeftStartPositions64xyLow.xy` | `instanceLeftPositions64xyLow`  |
+| | `instanceLeftStartPositions64xyLow.zw` | `instanceStartPositions64xyLow` |
+| | `instanceEndRightPositions64xyLow.xy`  | `instanceEndPositions64xyLow`   |
+| | `instanceEndRightPositions64xyLow.zw`  | `instanceRightPositions64xyLow` |
+| `ArcLayer` | `instancePositions64Low` | `instancePositions64xyLow`  |
+| `ScenegraphLayer` | `instancePositions64xy` | `instancePositions64xyLow`  |
+| `SimpleMeshLayer` | `instancePositions64xy` | `instancePositions64xyLow`  |
+
+
+#### @deck.gl/json
+
+- Non-breaking Change: The `_JSONConverter` class has been renamed to `JSONConverter` (deprecated alias still available).
+- Non-breaking Change: The `_JSONConverter.convertJson()` method has been renamed to `JSONConverter.convert()`  (deprecated stub still available).
+- Breaking Change: The `_JSONConverter` no longer automatically injects deck.gl `View` classes and enumerations. If reqiured need to import and add these to your `JSONConfiguration`.
+- Removed: The `JSONLayer` is no longer included in this module. The code for this layer has been moved to an example in `/test/apps/json-layer`, and would need to be copied into applications to be used.
+
+
+## Upgrading from deck.gl v7.1 to v7.2
+
+#### Breaking Changes
+
+##### Layer methods
+
+Following `Layer` class methods have been removed :
+
+| Removed            | Alternate       | Comment |
+| ---              | --- | --- |
+| `use64bitProjection`  | use `Fp64Extension` | details in `fp64 prop` section below  |
+| `is64bitEnabled`      | use `Fp64Extension` | details in `fp64 prop` section below  |
+| `updateAttributes` | `_updateAttributes` | method is renamed |
+
+
+##### fp64 prop
+
+The deprecated `fp64` prop is removed. The current 32-bit projection is generally precise enough for almost all use cases. If you previously use this feature:
+
+  ```js
+  /// old
+  import {COORDINATE_SYSTEM} from '@deck.gl/core';
+
+  new ScatterplotLayer({
+    coordinateSystem: COORDINATE_SYSTEM.LNGLAT_DEPRECATED,
+    fp64: true,
+    ...
+  })
+  ```
+
+  It can be changed to:
+
+  ```js
+  /// new
+  import {COORDINATE_SYSTEM} from '@deck.gl/core';
+  import {Fp64Extension} from '@deck.gl/extensions';
+
+  new ScatterplotLayer({
+    coordinateSystem: COORDINATE_SYSTEM.LNGLAT_DEPRECATED,
+    extensions: [new Fp64Extension()],
+    ...
+  })
+  ```
+
+##### Color Attributes and Uniforms
+
+All core layer shaders now receive **normalized** color attributes and uniforms. If you were previously subclassing a core layer with custom vertex shaders, you should expect the color attributes to be in `[0, 1]` range instead of `[0, 255]`.
+
+##### project64 Shader Module
+
+The `project64` shader module is no longer registered by default. If you were previously using a custom layer that depends on this module:
+
+  ```js
+  getShaders() {
+    return {vs, fs, modules: ['project64']};
+  }
+  ```
+
+  It can be changed to:
+
+  ```js
+  import {project64} from '@deck.gl/core';
+
+  getShaders() {
+    return {vs, fs, modules: [project64]};
+  }
+  ```
+#### CPU Grid layer and Hexagon layer updateTriggers
+
+`getElevationValue`, `getElevationWeight` and `getColorValue`, `getColorWeight` are now compared using `updateTriggers` like other layer [accessors](https://github.com/uber/deck.gl/blob/master/docs/developer-guide/using-layers.md#accessors). Update them without passing updateTriggers will no longer trigger layer update.
+
+#### Deprecations
+
+IE support is deprecated and will be removed in the next major release.
+
+
 ## Upgrading from deck.gl v7.0 to v7.1
 
-Breaking Changes:
+#### Breaking Changes
 
 - Fixed a bug where `coordinateOrigin`'s `z` is not applied in `METER_OFFSETS` and `LNGLAT_OFFSETS` coordinate systems.
+- If your application was subclassing `GridLayer`, you should now subclass `CPUGridLayer` instead, and either use it directly, or provide it as the sublayer class for `GridLayer` using `_subLayerProps`:
+
+  ```js
+  class EnhancedCPUGridLayer extends CPUGridLayer {
+  // enhancments
+  }
+
+  // Code initilizing GridLayer
+  const myGridLayer = new GridLayer({
+    // props
+    ...
+    // Override sublayer type for 'CPU'
+    _subLayerProps: {
+      CPU: {
+        type: EnhancedCPUGridLayer
+      }
+    }
+  });
+  ```
+
+#### Deprecations
+
+- `getColor` props in `ColumnLayer` and `H3HexagonLayer` are deprecated. Use `getLineColor` and `getFillColor` instead.
 
 ## Upgrading from deck.gl v6.4 to v7.0
 

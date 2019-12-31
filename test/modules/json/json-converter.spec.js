@@ -1,42 +1,12 @@
 import test from 'tape-catch';
-import {Deck} from '@deck.gl/core';
-import {_JSONConverter as JSONConverter} from '@deck.gl/json';
+import {makeSpy} from '@probe.gl/test-utils';
 
-import {COORDINATE_SYSTEM} from '@deck.gl/core';
-import GL from '@luma.gl/constants';
-
-const configuration = {
-  // a map of all layers that should be exposes as JSONLayers
-  layers: Object.assign({}, require('@deck.gl/layers')),
-  // Any non-standard views
-  views: {},
-  // Enumerations that should be available to JSON parser
-  // Will be resolved as `<enum-name>.<enum-value>`
-  enumerations: {
-    COORDINATE_SYSTEM,
-    GL
-  }
-};
-
-const JSON_DATA = {
-  initialViewState: {
-    longitude: -122.45,
-    latitude: 37.8,
-    zoom: 12
-  },
-  layers: [
-    {
-      type: 'ScatterplotLayer',
-      data: [{position: [-122.45, 37.8]}],
-      getColor: [255, 0, 0, 255],
-      getRadius: 1000
-    },
-    {
-      type: 'TextLayer',
-      data: [{position: [-122.45, 37.8], text: 'Hello World'}]
-    }
-  ]
-};
+import {COORDINATE_SYSTEM} from '@deck.gl/core/lib/constants';
+import {MapController} from '@deck.gl/core';
+import {JSONConverter} from '@deck.gl/json';
+import configuration, {log} from './json-configuration-for-deck';
+import JSON_DATA from './data/deck-props.json';
+import COMPLEX_JSON from './data/complex-data.json';
 
 test('JSONConverter#import', t => {
   t.ok(JSONConverter, 'JSONConverter imported');
@@ -53,34 +23,44 @@ test('JSONConverter#convert', t => {
   const jsonConverter = new JSONConverter({configuration});
   t.ok(jsonConverter, 'JSONConverter created');
 
-  const deckProps = jsonConverter.convertJsonToDeckProps(JSON_DATA);
+  let deckProps = jsonConverter.convert(JSON_DATA);
   t.ok(deckProps, 'JSONConverter converted correctly');
+  t.is(deckProps.views.length, 2, 'JSONConverter converted views');
+  t.is(deckProps.controller, MapController, 'Should evaluate constants.');
+
+  deckProps = jsonConverter.convert(COMPLEX_JSON);
+  const pointCloudLayerProps = deckProps.layers[3].props;
+  t.is(
+    pointCloudLayerProps.coordinateSystem,
+    COORDINATE_SYSTEM.METER_OFFSETS,
+    'Should evaluate enums.'
+  );
+
   t.end();
 });
 
-test('JSONConverter#render', t => {
-  if (typeof document === 'undefined') {
-    t.comment('test only available in browser');
-    t.end();
-    return;
-  }
-
+test('JSONConverter#badConvert', t => {
   const jsonConverter = new JSONConverter({configuration});
   t.ok(jsonConverter, 'JSONConverter created');
+  const badData = JSON.parse(JSON.stringify(JSON_DATA));
+  badData.layers[0]['@@type'] = 'InvalidLayer';
+  makeSpy(log, 'warn');
+  jsonConverter.convert(badData);
+  t.ok(log.warn.called, 'should produce a warning message if the layer type is invalid');
+  log.warn.restore();
+  t.end();
+});
 
-  const deckProps = jsonConverter.convertJsonToDeckProps(JSON_DATA);
-  t.ok(deckProps, 'JSONConverter converted correctly');
-
-  const jsonDeck = new Deck(
-    Object.assign(
-      {
-        onAfterRender: () => {
-          t.ok(jsonDeck, 'JSONConverter rendered');
-          jsonDeck.finalize();
-          t.end();
-        }
-      },
-      deckProps
-    )
-  );
+test('JSONConverter#handleTypeAsKey', t => {
+  const jsonConverter = new JSONConverter({configuration});
+  t.ok(jsonConverter, 'JSONConverter created');
+  const complexData = JSON.parse(JSON.stringify(COMPLEX_JSON));
+  const deckProps = jsonConverter.convert(complexData);
+  t.ok(deckProps.layers.length, 4, 'should have four layers');
+  t.ok(deckProps.layers[0].id === 'ScatterplotLayer', 'should have a ScatterplotLayer at index 0');
+  t.ok(deckProps.layers[1].id === 'TextLayer', 'should have a TextLayer at index 1');
+  t.ok(deckProps.layers[2].id === 'GeoJsonLayer', 'should have a GeoJsonLayer at index 2');
+  t.ok(deckProps.layers[3].id === 'PointCloudLayer', 'should have a PointCloudLayer at index 3');
+  t.ok(deckProps.layers[2].props.data.features[0].type === 'Feature');
+  t.end();
 });

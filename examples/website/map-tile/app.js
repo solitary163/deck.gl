@@ -1,9 +1,12 @@
 import React, {PureComponent} from 'react';
 import {render} from 'react-dom';
 
-import DeckGL, {TileLayer, BitmapLayer} from 'deck.gl';
+import DeckGL from '@deck.gl/react';
+import {TileLayer} from '@deck.gl/geo-layers';
+import {BitmapLayer} from '@deck.gl/layers';
+import {load} from '@loaders.gl/core';
 
-export const INITIAL_VIEW_STATE = {
+const INITIAL_VIEW_STATE = {
   latitude: 47.65,
   longitude: 7,
   zoom: 4.5,
@@ -14,7 +17,7 @@ export const INITIAL_VIEW_STATE = {
 // https://wiki.openstreetmap.org/wiki/Slippy_map_tilenames#Tile_servers
 const tileServer = 'https://c.tile.openstreetmap.org/';
 
-export class App extends PureComponent {
+export default class App extends PureComponent {
   constructor(props) {
     super(props);
     this.state = {};
@@ -48,17 +51,20 @@ export class App extends PureComponent {
         onHover: this._onHover,
         autoHighlight,
         highlightColor,
-        opacity: 1,
         // https://wiki.openstreetmap.org/wiki/Zoom_levels
         minZoom: 0,
         maxZoom: 19,
 
+        getTileData: ({x, y, z}) => load(`${tileServer}/${z}/${x}/${y}.png`),
+
         renderSubLayers: props => {
-          const {x, y, z, bbox} = props.tile;
-          const {west, south, east, north} = bbox;
+          const {
+            bbox: {west, south, east, north}
+          } = props.tile;
 
           return new BitmapLayer(props, {
-            image: `${tileServer}/${z}/${x}/${y}.png`,
+            data: null,
+            image: props.data,
             bounds: [west, south, east, north]
           });
         }
@@ -67,15 +73,8 @@ export class App extends PureComponent {
   }
 
   render() {
-    const {viewState, controller = true} = this.props;
-
     return (
-      <DeckGL
-        layers={this._renderLayers()}
-        initialViewState={INITIAL_VIEW_STATE}
-        viewState={viewState}
-        controller={controller}
-      >
+      <DeckGL layers={this._renderLayers()} initialViewState={INITIAL_VIEW_STATE} controller={true}>
         {this._renderTooltip}
       </DeckGL>
     );

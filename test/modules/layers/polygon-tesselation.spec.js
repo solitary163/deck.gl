@@ -109,7 +109,10 @@ test('polygon#fuctions', t => {
     t.comment(object.name);
 
     const complexPolygon = Polygon.normalize(object.polygon, 2);
-    t.ok(ArrayBuffer.isView(complexPolygon.positions), 'Polygon.normalize flattens positions');
+    t.ok(
+      ArrayBuffer.isView(complexPolygon.positions || complexPolygon),
+      'Polygon.normalize flattens positions'
+    );
     if (complexPolygon.holeIndices) {
       t.ok(
         Array.isArray(complexPolygon.holeIndices),
@@ -150,18 +153,11 @@ test('PolygonTesselator#constructor', t => {
 
       t.is(tesselator.instanceCount, 73, 'PolygonTesselator counts points correctly');
       t.is(tesselator.vertexCount, 135, 'PolygonTesselator counts indices correctly');
-      t.ok(Array.isArray(tesselator.bufferLayout), 'PolygonTesselator.bufferLayout');
+      t.ok(Array.isArray(tesselator.vertexStarts), 'PolygonTesselator.vertexStarts');
 
       t.ok(ArrayBuffer.isView(tesselator.get('indices')), 'PolygonTesselator.get indices');
       t.ok(ArrayBuffer.isView(tesselator.get('positions')), 'PolygonTesselator.get positions');
       t.ok(ArrayBuffer.isView(tesselator.get('vertexValid')), 'PolygonTesselator.get vertexValid');
-
-      if (testCase.params.fp64) {
-        t.ok(
-          ArrayBuffer.isView(tesselator.get('positions64xyLow')),
-          'PolygonTesselator.get positions64xyLow'
-        );
-      }
     });
   });
 
@@ -185,12 +181,12 @@ test('PolygonTesselator#tesselation', t => {
   });
 
   t.deepEquals(
-    tesselator.get('indices'),
+    tesselator.get('indices').slice(0, 24),
     [1, 3, 2, 4, 12, 11, 10, 12, 4, 5, 6, 7, 7, 4, 11, 10, 4, 5, 5, 7, 11, 11, 10, 5],
     'returned correct indices'
   );
   t.deepEquals(
-    tesselator.get('vertexValid'),
+    tesselator.get('vertexValid').slice(0, 13),
     [1, 1, 1, 0, 1, 1, 1, 1, 0, 1, 1, 1, 0],
     'returned correct vertexValid'
   );
@@ -215,7 +211,7 @@ test('PolygonTesselator#partial update', t => {
   });
 
   let positions = tesselator.get('positions').slice(0, 27);
-  let indices = tesselator.get('indices');
+  let indices = tesselator.get('indices').slice(0, tesselator.vertexCount);
   t.is(tesselator.instanceCount, 9, 'Initial instance count');
   t.is(tesselator.vertexCount, 9, 'Initial vertex count');
   // prettier-ignore
@@ -230,7 +226,7 @@ test('PolygonTesselator#partial update', t => {
   accessorCalled.clear();
   tesselator.updatePartialGeometry({startRow: 2});
   positions = tesselator.get('positions').slice(0, 39);
-  indices = tesselator.get('indices');
+  indices = tesselator.get('indices').slice(0, tesselator.vertexCount);
   t.is(tesselator.instanceCount, 13, 'Updated instance count');
   t.is(tesselator.vertexCount, 12, 'Updated vertex count');
   // prettier-ignore
@@ -246,7 +242,7 @@ test('PolygonTesselator#partial update', t => {
   accessorCalled.clear();
   tesselator.updatePartialGeometry({startRow: 0, endRow: 1});
   positions = tesselator.get('positions').slice(0, 39);
-  indices = tesselator.get('indices').slice(0, 12);
+  indices = tesselator.get('indices').slice(0, tesselator.vertexCount);
   t.is(tesselator.instanceCount, 13, 'Updated instance count');
   t.is(tesselator.vertexCount, 12, 'Updated vertex count');
   // prettier-ignore
@@ -257,6 +253,90 @@ test('PolygonTesselator#partial update', t => {
   ], 'positions');
   t.deepEquals(indices, [1, 3, 2, 7, 4, 5, 5, 6, 7, 10, 12, 11], 'incides');
   t.deepEquals(Array.from(accessorCalled), ['A'], 'Accessor called only on partial data');
+
+  t.end();
+});
+
+test('PolygonTesselator#normalize', t => {
+  const sampleData = [
+    {polygon: [1, 1, 2, 2, 3, 0], id: 'not-closed'},
+    {polygon: [0, 0, 2, 0, 2, 2, 0, 2, 0, 0], id: 'closed'},
+    {
+      polygon: {positions: [0, 0, 3, 0, 3, 3, 0, 3, 1, 1, 2, 1, 1, 2], holeIndices: [8]},
+      id: 'not-closed-with-holes'
+    }
+  ];
+  const tesselator = new PolygonTesselator({
+    data: sampleData,
+    normalize: false,
+    getGeometry: d => d.polygon,
+    positionFormat: 'XY'
+  });
+
+  t.is(tesselator.instanceCount, 15, 'Updated instanceCount without normalization');
+
+  tesselator.updateGeometry({
+    normalize: true
+  });
+
+  t.is(tesselator.instanceCount, 18, 'Updated instanceCount with normalization');
+
+  t.end();
+});
+
+test('PolygonTesselator#geometryBuffer', t => {
+  const sampleData = {
+    length: 2,
+    startIndices: [0, 3],
+    attributes: {
+      getPolygon: new Float64Array([1, 1, 2, 2, 3, 3, 0, 0, 2, 0, 2, 2, 0, 2, 0, 0])
+    }
+  };
+  const tesselator = new PolygonTesselator({
+    data: sampleData,
+    buffers: sampleData.attributes,
+    geometryBuffer: sampleData.attributes.getPolygon,
+    positionFormat: 'XY'
+  });
+
+  t.is(tesselator.instanceCount, 9, 'Updated instanceCount from geometryBuffer');
+  t.deepEquals(
+    tesselator.get('positions').slice(0, 27),
+    [1, 1, 0, 2, 2, 0, 3, 3, 0, 1, 1, 0, 0, 0, 0, 2, 0, 0, 2, 2, 0, 0, 2, 0, 0, 0, 0],
+    'positions are populated'
+  );
+  t.ok(tesselator.get('indices'), 'indices generated');
+  t.deepEquals(
+    tesselator.get('vertexValid').slice(0, 9),
+    [1, 1, 1, 0, 1, 1, 1, 1, 0],
+    'vertexValid are populated'
+  );
+
+  tesselator.updateGeometry({
+    normalize: false
+  });
+
+  t.is(tesselator.instanceCount, 8, 'Updated instanceCount from geometryBuffer');
+  t.is(tesselator.vertexStarts, sampleData.startIndices, 'Used external startIndices');
+  t.notOk(tesselator.get('positions'), 'skipped packing positions');
+  t.ok(tesselator.get('indices'), 'indices generated');
+  t.deepEquals(
+    tesselator.get('vertexValid').slice(0, 8),
+    [1, 1, 0, 1, 1, 1, 1, 0],
+    'vertexValid are populated'
+  );
+
+  sampleData.attributes.indices = new Uint16Array([6, 3, 4, 4, 5, 6]);
+  tesselator.updateGeometry({
+    normalize: false
+  });
+  t.notOk(tesselator.get('positions'), 'skipped packing positions');
+  t.notOk(tesselator.get('indices'), 'skipped packing indices');
+  t.deepEquals(
+    tesselator.get('vertexValid').slice(0, 8),
+    [1, 1, 0, 1, 1, 1, 1, 0],
+    'vertexValid are populated'
+  );
 
   t.end();
 });

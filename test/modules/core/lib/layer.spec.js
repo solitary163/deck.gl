@@ -20,9 +20,12 @@
 
 import test from 'tape-catch';
 import {Layer, AttributeManager, COORDINATE_SYSTEM, MapView, OrbitView} from 'deck.gl';
-import {testInitializeLayer} from '@deck.gl/test-utils';
+import {testInitializeLayer, testLayer} from '@deck.gl/test-utils';
 import {makeSpy} from '@probe.gl/test-utils';
 import {equals, Matrix4} from 'math.gl';
+import {Timeline} from '@luma.gl/core';
+
+import {sleep, testAsyncData} from './async-iterator-test-utils';
 
 const dataVariants = [{data: ['a', 'b', 'c'], size: 3}];
 
@@ -256,22 +259,6 @@ test('Layer#diffProps', t => {
   t.end();
 });
 
-test('Layer#use64bitProjection', t => {
-  let layer = new SubLayer({});
-  t.false(layer.use64bitProjection(), 'returns false for fp64: false');
-
-  layer = new SubLayer({fp64: true});
-  t.false(layer.use64bitProjection(), 'returns false for default mode');
-
-  layer = new SubLayer({coordinateSystem: COORDINATE_SYSTEM.METER_OFFSETS, fp64: true});
-  t.false(layer.use64bitProjection(), 'returns false for default mode');
-
-  layer = new SubLayer({coordinateSystem: COORDINATE_SYSTEM.LNGLAT_DEPRECATED, fp64: true});
-  t.true(layer.use64bitProjection(), 'returns true for legacy lnglat mode');
-
-  t.end();
-});
-
 test('Layer#use64bitPositions', t => {
   let layer = new SubLayer({});
   t.true(layer.use64bitPositions(), 'returns true for default settings');
@@ -279,11 +266,11 @@ test('Layer#use64bitPositions', t => {
   layer = new SubLayer({coordinateSystem: COORDINATE_SYSTEM.LNGLAT});
   t.true(layer.use64bitPositions(), 'returns true for COORDINATE_SYSTEM.LNGLAT');
 
-  layer = new SubLayer({coordinateSystem: COORDINATE_SYSTEM.LNGLAT_DEPRECATED});
-  t.false(layer.use64bitPositions(), 'returns false for COORDINATE_SYSTEM.LNGLAT_DEPRECATED');
+  layer = new SubLayer({coordinateSystem: COORDINATE_SYSTEM.CARTESIAN});
+  t.true(layer.use64bitPositions(), 'returns true for COORDINATE_SYSTEM.CARTESIAN');
 
-  layer = new SubLayer({fp64: true});
-  t.true(layer.use64bitPositions(), 'returns true for fp64: true');
+  layer = new SubLayer({coordinateSystem: COORDINATE_SYSTEM.METER_OFFSETS});
+  t.false(layer.use64bitPositions(), 'returns false for COORDINATE_SYSTEM.METER_OFFSETS');
 
   t.end();
 });
@@ -296,8 +283,7 @@ test('Layer#project', t => {
     height: 300,
     viewState: {longitude: 0, latitude: 0, zoom: 10}
   });
-
-  t.ok(equals(layer.project([0, 0, 100]), [200, 150, 0.8788028155547649]), 'returns correct value');
+  t.ok(equals(layer.project([0, 0, 100]), [200, 150, 0.9981698636949582]), 'returns correct value');
 
   layer = new SubLayer({
     coordinateSystem: COORDINATE_SYSTEM.METER_OFFSETS,
@@ -314,13 +300,13 @@ test('Layer#project', t => {
     equals(layer.project([100, 100, 100]), [
       215.91962780165122,
       134.08037212774843,
-      0.8788028155547649
+      0.9981698636949582
     ]),
     'returns correct value'
   );
 
   layer = new SubLayer({
-    coordinateSystem: COORDINATE_SYSTEM.IDENTITY,
+    coordinateSystem: COORDINATE_SYSTEM.CARTESIAN,
     modelMatrix: new Matrix4().rotateZ(Math.PI / 2)
   });
   testInitializeLayer({layer, onError: t.notOk});
@@ -332,12 +318,153 @@ test('Layer#project', t => {
 
   t.ok(
     equals(layer.project([100, 100, 100]), [
-      1.7748586567448557,
-      96.88573345752961,
-      0.7295077019654882
+      77.35308047269142,
+      60.21622351419864,
+      0.8327158213685135
     ]),
     'returns correct value'
   );
+
+  t.end();
+});
+
+test('Layer#Async Iterable Data', async t => {
+  async function getData() {
+    await sleep(50);
+    return [0, 1, 2, 3, 4, 5, 6, 7];
+  }
+
+  async function* getDataIterator() {
+    await sleep(50);
+    yield [0, 1, 2];
+    await sleep(50);
+    yield [3, 4];
+    await sleep(50);
+    yield [5, 6, 7];
+  }
+
+  let data = await testAsyncData(t, getData());
+  t.deepEquals(data, [0, 1, 2, 3, 4, 5, 6, 7], 'data is fully loaded');
+
+  data = await testAsyncData(t, getDataIterator());
+  t.deepEquals(data, [0, 1, 2, 3, 4, 5, 6, 7], 'data is fully loaded');
+
+  t.end();
+});
+
+test('Layer#uniformTransitions', t => {
+  const drawCalls = [];
+  const timeline = new Timeline();
+
+  class TestLayer extends Layer {
+    initializeState() {}
+
+    draw() {
+      drawCalls.push({
+        opacity: this.props.opacity
+      });
+    }
+  }
+
+  const testCases = [
+    {
+      props: {
+        id: 'testLayer',
+        data: [],
+        opacity: 0
+      },
+      onBeforeUpdate: () => timeline.setTime(0),
+      onAfterUpdate: () => t.deepEquals(drawCalls.pop(), {opacity: 0}, 'layer drawn with opacity')
+    },
+    {
+      updateProps: {
+        opacity: 1
+      },
+      onBeforeUpdate: () => timeline.setTime(100),
+      onAfterUpdate: () => t.deepEquals(drawCalls.pop(), {opacity: 1}, 'layer drawn with opacity')
+    },
+    {
+      updateProps: {
+        opacity: 0,
+        transitions: {
+          opacity: 200
+        }
+      },
+      onBeforeUpdate: () => timeline.setTime(200),
+      onAfterUpdate: () =>
+        t.deepEquals(drawCalls.pop(), {opacity: 1}, 'layer drawn with opacity in transition')
+    },
+    {
+      updateProps: {
+        opacity: 0
+      },
+      onBeforeUpdate: () => timeline.setTime(300),
+      onAfterUpdate: () =>
+        t.deepEquals(drawCalls.pop(), {opacity: 0.5}, 'layer drawn with opacity in transition')
+    },
+    {
+      updateProps: {
+        opacity: 0
+      },
+      onBeforeUpdate: () => timeline.setTime(400),
+      onAfterUpdate: () =>
+        t.deepEquals(drawCalls.pop(), {opacity: 0}, 'layer drawn with opacity in transition')
+    }
+  ];
+
+  testLayer({Layer: TestLayer, timeline, testCases, onError: t.notOk});
+
+  t.end();
+});
+
+test('Layer#calculateInstancePickingColors', t => {
+  const testCases = [
+    {
+      props: {
+        data: new Array(2).fill(0)
+      },
+      onAfterUpdate: ({layer}) => {
+        const {instancePickingColors} = layer.getAttributeManager().getAttributes();
+        t.deepEquals(
+          instancePickingColors.value.subarray(0, 6),
+          [1, 0, 0, 2, 0, 0],
+          'instancePickingColors is populated'
+        );
+      }
+    },
+    {
+      updateProps: {
+        data: new Array(3).fill(0)
+      },
+      onAfterUpdate: ({layer}) => {
+        const {instancePickingColors} = layer.getAttributeManager().getAttributes();
+        t.deepEquals(
+          instancePickingColors.value.subarray(0, 9),
+          [1, 0, 0, 2, 0, 0, 3, 0, 0],
+          'instancePickingColors is populated'
+        );
+      }
+    },
+    {
+      updateProps: {
+        data: new Array(3).fill(0)
+      },
+      onBeforeUpdate: ({layer}) => {
+        layer.clearPickingColor(new Uint8Array([2, 0, 0]));
+        layer.restorePickingColors();
+      },
+      onAfterUpdate: ({layer}) => {
+        const {instancePickingColors} = layer.getAttributeManager().getAttributes();
+        t.deepEquals(
+          instancePickingColors.value.subarray(0, 9),
+          [1, 0, 0, 2, 0, 0, 3, 0, 0],
+          'instancePickingColors is populated'
+        );
+      }
+    }
+  ];
+
+  testLayer({Layer: SubLayer2, testCases, onError: t.notOk});
 
   t.end();
 });

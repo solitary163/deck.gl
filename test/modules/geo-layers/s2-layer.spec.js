@@ -19,41 +19,71 @@
 // THE SOFTWARE.
 
 import test from 'tape-catch';
-import {testLayer} from '@deck.gl/test-utils';
+import {testLayer, generateLayerTests} from '@deck.gl/test-utils';
 import {S2Layer} from '@deck.gl/geo-layers';
+import {getS2QuadKey, getS2Polygon} from '@deck.gl/geo-layers/s2-layer/s2-utils';
 import data from 'deck.gl-test/data/s2-sf.json';
 
-test('S2Layer#constructor', t => {
-  testLayer({
-    Layer: S2Layer,
-    onError: t.notOk,
-    testCases: [
-      {props: []},
-      {props: null},
-      {
-        props: {
-          data,
-          getPolygon: f => f
-        }
-      },
-      {
-        updateProps: {
-          filled: false
-        },
-        onAfterUpdate({layer, subLayers, oldState}) {
-          t.ok(layer.state, 'should update layer state');
-          t.ok(subLayers.length, 'subLayers rendered');
+import {S2} from 's2-geometry';
+import Long from 'long';
 
-          const polygonLayer = layer.internalState.subLayers[0];
-          t.equal(
-            polygonLayer.state.paths.length,
-            data.length,
-            'should update PolygonLayers state.paths'
-          );
-        }
+test('S2Layer', t => {
+  const testCases = generateLayerTests({
+    Layer: S2Layer,
+    sampleProps: {
+      data,
+      getS2Token: d => d.token
+    },
+    assert: t.ok,
+    onBeforeUpdate: ({testCase}) => t.comment(testCase.title),
+    onAfterUpdate: ({layer, subLayer}) => {
+      t.ok(subLayer, 'subLayers rendered');
+
+      if (layer.props.data.length) {
+        t.equal(
+          subLayer.state.paths.length,
+          data.length,
+          'should update PolygonLayers state.paths'
+        );
       }
-    ]
+    }
   });
+
+  testLayer({Layer: S2Layer, testCases, onError: t.notOk});
+
+  t.end();
+});
+
+test('S2Layer#getS2QuadKey', t => {
+  const TEST_COORDINATES = [{lat: 0, lng: 0}, {lat: -122.45, lng: 37.78}, {lat: 85, lng: 180}];
+
+  const TEST_LEVELS = [1, 2, 4, 8, 16];
+
+  for (const point of TEST_COORDINATES) {
+    for (const level of TEST_LEVELS) {
+      const key = S2.latLngToKey(point.lat, point.lng, level);
+      const id = Long.fromString(S2.keyToId(key), true);
+      const token = id.toString(16).replace(/0+$/, '');
+
+      t.comment(`level ${level}, id: ${id.toString()}, token: ${token}`);
+      t.is(getS2QuadKey(key), key, 'Quad key to quad key');
+      t.is(getS2QuadKey(id), key, 'Id to quad key');
+      t.is(getS2QuadKey(token), key, 'Token to quad key');
+    }
+  }
+
+  t.end();
+});
+
+test('S2Layer#getS2Polygon', t => {
+  const TEST_TOKENS = ['80858004', '1c', new Long(0, -2138636288, false)];
+
+  for (const token of TEST_TOKENS) {
+    const polygon = getS2Polygon(token);
+    t.ok(polygon instanceof Float64Array, 'polygon is flat array');
+    t.is((polygon.length / 2 - 1) % 4, 0, 'polygon has 4 sides');
+    t.deepEqual(polygon.slice(0, 2), polygon.slice(-2), 'polygon is closed');
+  }
 
   t.end();
 });

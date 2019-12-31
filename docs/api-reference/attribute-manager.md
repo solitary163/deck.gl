@@ -19,16 +19,16 @@ For more information consult the [Attribute Management](/docs/developer-guide/cu
 ##### `setDefaultLogFunctions`
 
 Sets log functions to help trace or time attribute updates.
-Default logging uses the luma.gl logger.
+Default logging uses the deck.gl logger.
 
 Note that the app may not be in control of when update is called,
 so hooks are provided for update start and end.
 
 Parameters:
 
-* `opts.onLog` (Function) - callback, called to print
-* `opts.onUpdateStart` (Function) - callback, called before update() starts
-* `opts.onUpdateEnd` (Function) - callback, called after update() ends
+* `opts.onUpdateStart` (Function) - callback, called before an attribute starts updating
+* `opts.onUpdate` (Function) - callback, called when update is performed. Receives an argument `message` detailing the update operation.
+* `opts.onUpdateEnd` (Function) - callback, called after an attribute is updated. Receives an argument `message` detailing the update operation.
 
 
 ## Constructor
@@ -60,26 +60,33 @@ Takes a single parameter as a map of attribute descriptor objects:
 
 * keys are attribute names
 * values are objects with attribute definitions:
-  + `size` (Number) - number of elements per object
-  + `accessor` (String | Array of strings | Function) - accessor name(s) that will
-    trigger an update of this attribute when changed. Used with
-    [`updateTriggers`](/docs/api-reference/layer.md#-updatetriggers-object-optional-).
-  + `update` (Function) - the function to be called when data changes
-  + `instanced` (Boolean, optional) - if this is an instanced attribute
-    (a.k.a. divisor). Default to `false`.
-  + `isIndexed` (Boolean, optional) - if this is an index attribute
-    (a.k.a. indices). Default to `false`.
-  + `constant` (Boolean, optional) - if this is a generic attribute
-    (same value applied to every vertex). Default to `false`.
-  + `noAlloc` (Boolean, optional) - if this attribute should not be
-    automatically allocated. Default to `false`.
-  + `shaderAttributes` (Object, optional) - If this attribute maps to multiple
+  - luma.gl [accessor parameters](https://luma.gl/#/documentation/api-reference/webgl-2-classes/accessor):
+    * `type` (Enum, optional) - data type of the attribute, see "Remarks" section below.
+    * `size` (Number) - number of elements per vertex
+    * `normalized` (Boolean) - default `false`
+    * `integer` (Boolean) - WebGL2 only, default `false`
+    * `divisor` (Boolean, optional) - `1` if this is an instanced attribute
+      (a.k.a. divisor). Default to `0`.
+  - deck.gl attribute configurations:
+    * `isIndexed` (Boolean, optional) - if this is an index attribute
+      (a.k.a. indices). Default to `false`.
+    * `accessor` (String | Array of strings | Function) - accessor name(s) that will
+      trigger an update of this attribute when changed. Used with
+      [`updateTriggers`](/docs/api-reference/layer.md#-updatetriggers-object-optional-).
+    * `transform` (Function, optional) - callback to process the result returned by `accessor`.
+    * `update` (Function, optional) - the function to be called when data changes. If not supplied, the attribute will be auto-filled with `accessor`.
+    * `defaultValue` (Number | Array of numbers, optional) - Default `[0, 0, 0, 0]`.
+    * `noAlloc` (Boolean, optional) - if this attribute should not be
+      automatically allocated. Default to `false`.
+  - `shaderAttributes` (Object, optional) - If this attribute maps to multiple
     attributes in the vertex shader, that mapping can be defined here. All
     `shaderAttributes` will share a single buffer created based on the `size`
-    parameter. This can be used to interleave attributes. Shader attribute properties are:
-    * `size` (Number) - Number of elements per object.
-    * `offset` (Number) - Offset of the initial element.
-    * `stride` (Number) - Stride between elements.
+    parameter. This can be used to interleave attributes. Each shader attribute object may contain any of the following:
+    * `size` (Number) - number of elements per vertex
+    * `vertexOffset` (Number) - offset of the attribute by vertex (stride). Default `0`.
+    * `elementOffset` (Number) - offset of the attribute by element. default `0`.
+    * `divisor` (Boolean, optional) - `1` if this is an instanced attribute
+      (a.k.a. divisor). Default to `0`.
 
 ##### `addInstanced`
 
@@ -145,7 +152,23 @@ Notes:
 * Any preallocated buffers in "buffers" matching registered attribute names will be used. No update will happen in this case.
 * Calls onUpdateStart and onUpdateEnd log callbacks before and after.
 
+## Remarks
+
+### Attribute Type
+
+The following `type` values are supported for attribute definitions:
+
+| type | value array type | notes |
+| ---- | ---------------- | ----- |
+| `GL.FLOAT` | `Float32Array` | |
+| `GL.DOUBLE` | `Float64Array` | Because 64-bit floats are not supported by WebGL, the value is converted to an interleaved `Float32Array` before uploading to the GPU. It is exposed to the vertex shader as two attributes, `<attribute_name>` and `<attribute_name>64Low`, the sum of which is the 64-bit value. |
+| `GL.BYTE` | `Int8Array` | |
+| `GL.SHORT` | `Int16Array` | |
+| `GL.INT` | `Int32Array` | |
+| `GL.UNSIGNED_BYTE` | `Uint8ClampedArray` | |
+| `GL.UNSIGNED_SHORT` | `Uint16Array` | |
+| `GL.UNSIGNED_INT` | `Uint32Array` | |
 
 ## Source
 
-[modules/core/src/lib/attribute-manager.js](https://github.com/uber/deck.gl/blob/master/modules/core/src/lib/attribute-manager.js)
+[modules/core/src/lib/attribute-manager.js](https://github.com/uber/deck.gl/blob/master/modules/core/src/lib/attribute/attribute-manager.js)

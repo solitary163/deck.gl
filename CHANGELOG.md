@@ -2,6 +2,8 @@
 
 All notable changes to deck.gl will be documented in this file.
 
+For a human readable version, visit https://deck.gl/#/documentation/overview/upgrade-guide
+
 <!--
 Each version should:
   List its release date in the above format.
@@ -15,9 +17,632 @@ Each version should:
 Ref: http://keepachangelog.com/en/0.3.0/
 -->
 
+## deck.gl v8.0
+
+### deck.gl v8.0 Prereleases
+
+### deck.gl [8.0.0-beta.2] - Dec 17 2019
+
+- Fix ScenegraphLayer asset wait (#4025)
+- pydeck: Update for new @deck.gl/json API and add additional tes… (#4020)
+- Smooth edges in scatterplot (#4021)
+- Fix s2 layer polygon generation (#4024)
+- Tweak to scenegraph layer fix (#4027)
+- Bump math.gl and probe.gl dependencies (#4029)
+- React module fixes (#4032)
+- [Fix]: CPU Aggregation: filter out points outside of viewport. (#4026)
+- Support preprojection in PolygonTesselator (#4035)
+- Fix WebGL BlendEquation warnings (#4037)
+- Layer bug fixes (#4040)
+
+### deck.gl [8.0.0-beta.1] - Dec 13 2019
+
+- bump loaders.gl to beta.5 (#4018)
+- pydeck: Make a single bundle for use in standalone and Jupyter rendering (#4010)
+- Clean up LayerManager (#4011)
+- Audit assert usages (#4012)
+- React: eventManager listens to all children (#4013)
+- Bump loaders.gl to 2.0.0-beta (#4009)
+- TextLayer: support background color (#3903)
+- Improve createProps perf (#4007)
+- Icon layer: Use 2D positions to match vertex shader (#3736)
+- @deck.gl/json: Fix function lookups in classes (#3995)
+- TileLayer: change onViewportLoaded to onViewportLoad (#3997)
+- Fix bundle config (#3992)
+- Prop rename: filterData to _filterData (#3989)
+- Voodoo fix for polygon rendering on Linux/Intel (#3990)
+
+#### deck.gl [8.0.0-alpha.2] - Dec 10 2019
+
+- ContourLayer: optimize sublayer prop setup (#3985)
+- Enable composeModelMatrix for meshlayers (#3977)
+- Remove `experimental` export, use underscores (#3982)
+- Various bug fixes for using binary data (#3987)
+
+#### deck.gl [8.0.0-alpha.1] - Dec 9 2019
+
+- Tile3DLayer: v8.0 audit (#3972)
+- move project64 module to extensions (#3981)
+- GPUGridAggregator: use fp64arithmetic module instead of fp64 (#3978)
+- CPUAggregation Refactor : Grid and Hexagon Layers, use attributes for position (#3951)
+- @deck.gl/json: Use @@type to register convertible classes (#3958)
+- Upgrade probe.gl (part 2) (#3973)
+- upgrade probe.gl (#3971)
+- Clean up change flags handling in Layer class (#3968)
+- reuse instancePickingColor array (#3969)
+- Debug API (#3957)
+- pydeck: Set fewer defaults within Python API (#3960)
+- Clean up layer internal state (#3955)
+- [JupyterLab support] Enable JupyterLab for pydeck (#3638)
+- Projection modes (#3950)
+- Improve AttributeManager logging perf (#3941)
+- More luma updates (#3942)
+- Remove seer integration (#3940)
+- Remove texture flip (#3939)
+- Fix polygon offset (#3938)
+- Updates to luma 8.0 alpha 10 (#3934)
+- Fix FirstPersonView and FirstPersonController (#3924)
+- Move PathLayer getDashArray feature to an extension (#3922)
+- Simplify bundle luma exports (#3913)
+- Support binary logical attributes in PathLayer and SolidPolygonLayer (#3916)
+- Various core deprecations (#3919)
+- Add option to skip normalization in PolygonLayer (#3921)
+- Bump h3-js (#3918)
+- Optimize (#3906)
+- Move substantial data operation inside unit tests (#3917)
+- Support binary logical attributes (#3898)
+- Add option to skip normalization in tesselators (#3905)
+- Handle offset in DataColumn (#3902)
+- Light tesselator refactor (#3901)
+- Support variable-width values in auto update (#3897)
+- Change bufferLayout to startIndices (#3894)
+- simplify PathLayer attributes (#3889)
+- Support 3D in ArcLayer (#3888)
+- Use 3D 64-bit positions (#3885)
+- Fix playground example and website examples (#3883)
+- Bump to luma 8.0 (#3868)
+- [v8.0] Change layer opacity default to 1 (#3879)
+- Fix view state handling (#3870)
+- [v8.0] Scripting API update (#3880)
+- Remove dependency on `registerShaderModule` (#3882)
+- AggregationLayer : minor fixes and unit tests. (#3851)
+- remove deprecated layer props (#3878)
+- Layer class deprecations (#3877)
+- Implement min/max pixels for scenegraph-layer (#3382)
+- v8.0 TripsLayer API change (#3874)
+- Bump loaders.gl dependencies (#3862)
+- Fix attribute constant comparison (#3872)
+- Attribute class refactor (#3852)
+- Zoom-independent common space (#3841)
+- Optionally surface pydeck warnings in widget UI (#3785)
+- Integrate all aggregation layers with AttributeManager (#3777)
+- viewport/projection related deprecations (#3832)
+- TextLayer: support text auto wrapping (#3682)
+- ScreenGridLayer: Split into Composite and SubLayer (#3726)
+
+
+### deck.gl v7.4 Prereleases
+
+#### deck.gl [v7.4.0-alpha.2] - Oct 4 2019
+
+- TileLayer cache rendered sub layers (#3730)
+- HeatmapLyaer: set point size to address ANGLE bug (#3732)
+- clean up render passes (#3733)
+- GPUGridAggregator: enforce point size to workaround ANGLE bug (#3738)
+- Add `pass` parameter to layerFilter (#3739)
+- Improve auto-highlight related perf (#3740)
+- Effects system clean up (#3743)
+- Fix 3d picking projection with camera offset (#3749)
+- Support rendering to custom framebuffer (#3742)
+
+#### deck.gl [v7.4.0-alpha.1] - Oct 2 2019
+
+- delete deprecated buffer props (#3651)
+- Consolidate picking injection (#3720)
+- Picking 3D point (#3721)
+- Add domain method to scales (#3631)
+- Integrate Quantile and Ordinal scaling (#3609)
+- Clean up picking code (#3724)
+
+
+## deck.gl v7.3
+
+#### deck.gl [v7.3.7] - Dec 10 2019
+
+- Voodoo fix for polygon rendering on Linux/Intel (#3990)
+- [Enhancement] Supporting quantile and other scale type in aggregation layer (#3920)
+- [Experimental] add _filterData prop to cpu aggregation layer (#3876)
+
+#### deck.gl [v7.3.6] - Nov 11 2019
+
+- Bump loaders.gl dependencies (#3862)
+
+#### deck.gl [v7.3.5] - Nov 8 2019
+
+- Fix texture crash in Safari (#3848)
+- Fix: custom controller events (#3857)
+- Fix attribute allocation bug when using partial update with double precision (#3854)
+- Fix IconLayer autopacking bug (#3847)
+
+#### deck.gl [v7.3.4] - Nov 4 2019
+
+- TileLayer: only invalidate tile.layer when updateTriggerChanged (#3823)
+- HeatmapLayer: fix sublayer id (#3813)
+
+#### deck.gl [v7.3.3] - Oct 15 2019
+
+- TileLayer: Invalidate cache when updateTriggers changed (#3788)
+- Bump luma.gl to 7.3.2
+
+#### deck.gl [v7.3.2] - Oct 3 2019
+
+- GridLayer: enforce point size to workaround ANGLE bug (#3738)
+- Bump luma.gl to 7.3.1
+- HeatmapLayer: set point size to address ANGLE bug (#3732)
+- TileLayer: cache rendered sub layers (#3730)
+- Bump pydeck to 0.1.dev5 (#3715
+
+#### deck.gl [v7.3.1] - Sep 30 2019
+
+- Clamp HeatmapLayer colorDomain on iOS (#3723)
+
+#### deck.gl [v7.3.0] - Sep 30 2019
+
+### deck.gl v7.3 Prereleases
+
+#### deck.gl [v7.3.0-beta.9] - Sep 27 2019
+
+- HeatmapLayer: Add 'colorDomain' prop (#3714)
+- Bump luma to prod version (#3712)
+
+#### deck.gl [v7.3.0-beta.8] - Sep 26 2019
+
+- Allow pydeck user to modify tooltip text (#3690)
+- Bump dependencies (#3706)
+
+#### deck.gl [v7.3.0-beta.7] - Sep 25, 2019
+
+- Always generate 64xyLow attributes for positions (#3696)
+
+#### deck.gl [v7.3.0-beta.6] - Sep 25, 2019
+
+- Fix HeatmapLayer crash in iOS (Safari) (#3681)
+
+#### deck.gl [v7.3.0-beta.5] - Sep 23, 2019
+
+- wrap accessors passed in subLayerProps (#3675)
+- Update S2 library within pydeck (#3678)
+
+#### deck.gl [v7.3.0-beta.4] - Sep 20, 2019
+
+- remove dead code (#3669)
+- Bump version for examples and sub modules (#3670)
+- fix S2Layer script dependency (#3674)
+- Fix bugs in pre-bundled version (#3672)
+
+#### deck.gl [v7.3.0-beta.3] - Sep 20, 2019
+
+- Improve multi-picking performance (#3668)
+- Pass DracoLoader to Tile3DLayer from app (#3635)
+- More picking bug fix (#3667)
+- Fix GPUGridLayer unhandled cellsize (#3535)
+- HeatmpaLayer: update required features for WebGL1 support. (#3656)
+- Clean up transition classes, avoid crash with `duration:0` (#3649)
+- remove transitions that have null settings (#3647)
+- Allow pydeck users to hide tooltip (#3626)
+- Fix multi-picking bug (#3652)
+
+#### deck.gl [v7.3.0-beta.2] - Sep 19, 2019
+
+- Fix GPUSpringTransition (#3627)
+- Implement isTransitioning check for attribute spring-transitions (#3618)
+
+#### deck.gl [v7.3.0-beta.1] - Sep 17, 2019
+
+- Bump dependency versions (#3623)
+- Fix bug that makes undefined key appear in aggregate layer pickingInfo (#3624)
+- Fix pixel ratio calculation, update docs (#3615)
+- Support spring transition in UniformTransitionManager (#3621)
+- Tileset3DLayer API audit (#3620)
+- _enableOffsetModelMatrix to _composeModelMatrix for API audit (#3614)
+- Update jupyter-widget module for new deck.gl/json API (#3584)
+- Add alphaCutoff prop to IconLayer (#3607)
+- Support constants and non instantiate prop in json module (#3606)
+- Update pydeck tooltip style and modularize the Jupyter widget tooltip (#3590)
+- remove module settings hack (#3603)
+- Adopt most recent change from loaders.gl and bump loaders.gl (#3597)
+- Expose loaders.gl endpoints from the core bundle (#3598)
+- Bundle optimization (#3593)
+- add extensions to master bundle (#3592)
+
+#### deck.gl [v7.3.0-alpha.7] - Sep 13, 2019
+
+- ScreenGridLayer: Replace UBO usage with Texture2D for max aggregation value (#3573)
+- Fix Tile3DLayer doc links (#3589)
+- Refactor Tile3DLayer and minimum test (#3578)
+- json: Playground simplifications (#3586)
+- Tests: use polyfilled gl for JSONConverter tests (#3587)
+- 3d tile example (#3582)
+- json: Test and code cleanup (#3585)
+- CSS to Device conversion: Replace custom code with luma.gl utilities methods (#3531)
+- bump luma.gl and loaders.gl
+- Update pydeck setup.py to include standalone require.js template (#3568)
+- Restore tests (#3581)
+- Add default tooltip to pydeck (#3562)
+- json: Simplify `JSONConfiguration` (#3577)
+- Add support for quantile and ordinal scale (#3546)
+- Add "Playground" (aka json-browser) to website (#3561)
+- Revert Python pyppeteer installation (#3575)
+- attribute spring transition (#3530)
+- json: minimap as pure json example (#3563)
+- ocular-dev-tools: 0.0.29 (modernize es6 dists) (#3569)
+- fix vricon tile stop rendering issue (#3570)
+- Provide additional support for Python 2.7 installations (#3565)
+- HeatmapLayer/GPUAggregator: fix WebGL feature checking (#3483)
+- add rendering test for shadow (#3564)
+- spring-based-transitions RFC draft (#3390)
+- Fix/Viewport Transitions FlyTo webpack config (#3556)
+- fix shadow module toggle bug (#3560)
+- json: Update JSON examples (#3558)
+- Generalized JSON converter (#3491)
+- bump math.gl version (#3553)
+- refactor interpolation transition (#3540)
+- Add Tile3DLayer doc (#3508)
+- Update the documentation and development file paths for pydeck (#3548)
+- [#3548 - Part I] Update pydeck README to include release URL and additional usage instructions (#3549)
+- use built-in tooltip API in examples (#3547)
+- Add Tile3DLayer to geo-layers module (#3523)
+- Fix ColumnLayer elevationScale example (#3542)
+- Support a default tooltip (#3529)
+- misc test warning fixes (#3539)
+- Add update trigger tests to generated tests (#3527)
+
+#### deck.gl [v7.3.0-alpha.6] - Sep 6, 2019
+
+- Fix double precision attribute transitions (#3532)
+- Add mybinder URL to pydeck README (#3538)
+- Revert pydeck path changes (#3537)
+- Fix GPUGridLayer crash when used with GridLayer (#3528)
+- Fix typos and broken links in the docs (#3524)
+
+#### deck.gl [v7.3.0-alpha.5] - Sep 5, 2019
+
+- [Feat] Hexagon/Grid, getColorValue, getElevationValue based on updateTriggers (#3473)
+- Integrate ProgramManager (#3504)
+- update website fonts (#3519)
+- produce more meaningful metrics (#3518)
+- Transition refactor (2/2): create one transform per attribute (#3498)
+- Transition system refactor (1/2): use timeline (#3496)
+- Support for live notebook updates and introduce 2-way notebook API communication (#3510)
+- Change dependency path spelling
+- Correct nbextension typo
+
+#### deck.gl [v7.3.0-alpha.4] - Aug 29, 2019
+
+- bump luma.gl to 7.3.0-alpha.5 (#3509)
+- Respect layer opacity in SimpleMeshLayer (#3488)
+- update the component-wrapping-rfc.md (#3507)
+- fix opacity issue in scene graph layer (#3506)
+- disable orbit controller rotation normalization (#3497)
+- Add markdown documentation for the pydeck library (#3423)
+- Add additional setup.py requirements (#3501)
+
+#### deck.gl [v7.3.0-alpha.3] - Aug 28, 2019
+
+- RFC: Component Wrapping System (#3503)
+
+#### deck.gl [v7.3.0-alpha.2] - Aug 28, 2019
+
+- fix dist test (#3502)
+- Disable model matrix for offset by default (#3500)
+- apply model matrix to offset in scene graph layer (#3499)
+- [jupyter-widget] update webpack configs (#3495)
+- Add development installation instructions (#3494)
+- Generic prop transition (#3443)
+- [jupyter-widget] use only one endpoint (#3493)
+- Simplify pydeck widget build (#3462)
+- [MapboxLayer] integrate mapbox-gl's near plane fix (#3490)
+- fix arc layer shaders (#3487)
+- IconLayer: check texture width and height before drawing (#3481)
+- Update deck.gl version to ^7.0.0 in docs (#3485)
+- Attribute: use `type: GL.DOUBLE` for double precision (#3477)
+
+#### deck.gl [v7.3.0-alpha.1] - Aug 21, 2019
+
+- update node requirement to 10.x (#3474)
+- Support double precision in Attribute class (#3468)
+- Relax restrictions for external buffers (#3472)
+- fix firefox invalid date (#3466)
+- Add interaction tests (#3461)
+- Update README.md
+- Add transform and enable options to attribute class (#3448)
+- Improve shadow for mesh layer (#3452)
+- update code sample in mapbox layer docs (#3459)
+- Support 360 rotation in OrbitController (#3454)
+- fix OrbitView bug when orbitAxis: Z (#3453)
+- Composite layer should rerender when state updates (#3434)
+- Fail gracefully in the event of a hexbin projection error (#3424)
+- Add warnings for invalid layer types in JSONConverter (#3444)
+- More unit test for SunLight class (#3442)
+- Use HTMLImageLoader for browser compatibility (#3440)
+- Support expression parsing for JSON API and pydeck (#3397)
+- Clean up gallery icon example (#3433)
+- Bump loaders dependencies in examples (#3430)
+- Bump luma.gl to 7.2.0 (#3429)
+- Website: Lock loaders.gl/las to 1.0.3 (#3428)
+- Website reference ES5 transpiled version of supercluster depend… (#3427)
+
+## deck.gl v7.2
+
+#### deck.gl [v7.2.4] - Sep 13, 2019
+
+- Bump loaders.gl to latest latest 1.2 prod (#3594)
+- add extensions to master bundle (#3592)
+
+#### deck.gl [v7.2.3] - Aug 16, 2019
+
+- IconLayer: check texture width and height before drawing (#3481)
+- integrate mapbox-gl's near plane fix (#3490)
+
+#### deck.gl [v7.2.2] - Aug 16, 2019
+
+- fix OrbitView bug when orbitAxis: Z (#3453)
+- Fail gracefully in the event of a hexbin projection error (#3424)
+- Improve shadow for mesh layer (#3452)
+
+#### deck.gl [v7.2.1] - Aug 13, 2019
+
+- Use HTMLImageLoader for browser compatibility (#3440)
+
+#### deck.gl [v7.2.0] - Aug 9, 2019
+
+- Bump luma.gl to 7.2.0 (#3429)
+- Website: Lock loaders.gl/las to 1.0.3 (#3428)
+- Website reference ES5 transpiled version of supercluster depend… (#3427)
+- Update links to point to 7.2 branch (#3426)
+
+### deck.gl v7.2 Prereleases
+
+#### deck.gl [v7.2.0-beta.3] - Aug 8, 2019
+
+- improve Deck minification (#3402)
+- Fix PathLayer/trips demo perf regression (#3410)
+- HeatmapLayer: website testing fixes (#3409)
+- Fix highway safety demo bugs (#3411)
+- ScreenGridLayer: skip aggregation when data is empty (#3412)
+- Add shadow to website home demo (#3413)
+- Fix sunlight with shadows (#3414)
+- Fix website data filter example (#3417)
+- Fix set external buffer (#3419)
+- Upgrade to loaders.gl@1.2.0 (#3420)
+
+
+#### deck.gl [v7.2.0-beta.2] - Aug 6, 2019
+
+- Calc right scale for shadow map (#3393)
+- Display rendering stats in layer browser (#3400)
+
+#### deck.gl [v7.2.0-beta.1] - Aug 6, 2019
+
+- Heatmap layer api audit (#3398)
+- Remove side effects from core module (#3395)
+- HeatmapLayer API audit (#3391)
+- Add shadow effect to LightingEffect class (#3387)
+- HeatmapLayer minor optimizations (#3388)
+- HeatmapLayer: Add tests and whats-new (#3384)
+- [HeatmapLayer] add debounce to zoom updates (#3386)
+- Simplify `layer.updateAttributes` override (#3381)
+- Bump luma.gl to 7.2-alpha.6 (#3383)
+- shadow feature for directional light (#3343)
+- Add : Heatmap Layer (#3379)
+- Rename frustum plane properties (#3378)
+- Fix TileLayer flashing (#3380)
+- make sure deck.gl reexports everything from core and layers (#3374)
+- Normalize bitmap layer color uniforms (#3369)
+- Normalize color attributes (#3365)
+- Deprecation warning for IE (#3360)
+- Improve core module test coverage (#3359)
+
+#### deck.gl [v7.2.0-alpha.4] - July 12, 2019
+
+- Fix missing pickingRadius for onClick handlers (#3321) (#3327)
+- Relax geometry validation in GeoJsonLayer (#3325)
+- Typed array manager (#3318)
+- Add support for streaming (#3312)
+- Support line breaks in text strings (#3322)
+- Support loaders.gl data attributes (#3302)
+- Add support for RGB color format (#3338)
+- Attribute allocation bug fixes (#3342)
+- Fix controller event propagation (#3345)
+
+#### deck.gl [v7.2.0-alpha.3] - July 10, 2019
+
+- Add an HTML page writer for pydeck (#3250)
+- Fix frustum cull (#3323)
+- Formal API for CompositeLayer data/accessor wrapping (#3311)
+
+#### deck.gl [v7.2.0-alpha.2] - July 3, 2019
+
+- Add Brushing extension (#3309)
+- Move fp64 support to an extension (#3308)
+- Add Brushing extension (#3309)
+- Move fp64 support to an extension (#3308)
+- Add extensions module (#3306)
+- composite layer: pass extension props through (#3307)
+- Implement layer extensions RFC (#3305)
+- ScenegraphLayer: scene detection fixup (#3300)
+- Implement layer shader hooks (#3295)
+- loaders.gl integration (#3276)
+- Update ScenegraphLayer to use GLTFLoader (#3288)
+- Add video support in BitmapLayer (#3203)
+- Update lerna.json (#3273)
+- fix missing viewport id (#3275)
+- Data Loading RFC (#3077)
+
+#### deck.gl [v7.2.0-alpha.1] - June 21, 2019
+
+- S2Layer bug fix (#3270)
+- upgrade to puppeteer 1.18 (#3267)
+- Revert "Add _scenegraphLoader property to ScenegraphLayer (#3258)" (#3265)
+- Improve test coverage for Grid layers and utils (#3262)
+- Data Partial Update (#3224)
+- Add _scenegraphLoader property to ScenegraphLayer (#3258)
+- update bundle configs (#3264)
+- Enable bitmap layer test (#3260)
+- Fix benchmark tests (#3257)
+- upgrade ocular-dev-tools (#3256)
+- json module bug fixes (#3253)
+- Fix fullscreen bug in GoogleMapsOverlay (#3255)
+- Fix missing brace on link in viewport doc
+- Add layer shader hooks rfc (#3218)
+- Improve unit test coverage (#3251)
+- [Bug] Fix H3HexagonLayer state update (#3246)
+- Fix picking rect calculation (#3244)
+- Add viewport helper functions, add documentation, support saving state across kernel restarts (#3205)
+- Cache frustum planes (#3242)
+- add deck tests with headless gl (#3243)
+- Frustum planes (#3241)
+- PathLayer attribute buffer reuse (#3211)
+- ScenegraphLayer: Add more unit tests, sort animations order (#3212)
+- Align controller behavior with react-map-gl (#3235)
+- add elementOffset to BaseAttribute (#3238)
+- Clean up outdated test apps (#3232)
+- CompositeLayer: add ability to override sublayer updateTriggers (#3234)
+- Add touchAction prop to Deck (#3231)
+- Add unit tests for controllers (#3230)
+- Clean up core utilities (#3229)
+- Update geo-layers unit tests (#3228)
+- Enable unit tests for canvas-based layers (#3226)
+- Layer browser perf and bug fixes (#3220)
+- H3Hexagon: add support for coverage. (#3210)
+- fix react method binding (#3219)
+- improve the depth encoding (#3217)
+- improve PostProcessEffect unit tests (#3208)
+- Fix unpkg links in layer documentations (#3216)
+- Fix tree shaking in pre-bundled version (#3214)
+- Give jupyter-widget JS module test coverage (#3146)
+- Unit tests for scenegraph-layer (#3204)
+- Add instanceColors support to ScenegraphLayer in PBR mode (#3200)
+- Add link to upgrade guide to CHANGELOG
+- Add sideEffects field to core package.json (#3202)
+- Attribute buffer handling bug fixes (#3207)
+- fix path layer vertex shader (#3206)
+- Support 3D paths with TripsLayer (#3192)
+- Note about metrics in what's new (#3201)
+- more unit tests for lighting effect and effect manager (#3190)
+- Bump dependency version
+- GPUGridLayer: make it exclusive for WebGL2 (#3195)
+- Address different publishing requirements (#3174)
+- Fix website control panel (#3193)
+- Fix layer-browser color picker (#3194)
+- Fix website bugs (#3191)
+- 7.1 website: fix crashes (#3187)
+- use supercluster for IconLayer demo clustering (#3188)
+- Reduce flashing in map-tile demo (#3182)
+- Fix BitmapLayer (#3181)
+- Fix GridLayer docs (#3177)
+- Website improvements (#3180)
+- upgrade website to react-map-gl v5 (#3179)
+- webside optimization (#3176)
+- Fix ArcLayer bug when using non-iterable data with pre-allocated target array (#3170)
+
 ## deck.gl v7.1
 
+#### deck.gl [v7.1.11] - Aug 6 2019
+
+- Remove side effects from core module (#3395)
+
+#### deck.gl [v7.1.10] - July 12 2019
+
+- Fix controller event propagation (#3345)
+
+#### deck.gl [v7.1.9] - July 10 2019
+
+- add NON_INSTANCED_MODEL define (#3333)
+
+#### deck.gl [v7.1.8] - July 10 2019
+
+- Fix missing pickingRadius for onClick handlers (#3321) (#3327)
+- Relax geometry validation in GeoJsonLayer (#3325)
+
+#### deck.gl [v7.1.7] - June 24 2019
+
+- fix missing viewport id (#3275)
+- Prevent publishing jupyter-widget module for now (#3273)
+
+#### deck.gl [v7.1.6] - June 21 2019
+
+- S2Layer bug fix (#3270)
+
+#### deck.gl [v7.1.5] - June 20 2019
+
+- update bundle configs (#3264)
+- json module bug fixes (#3253)
+- Fix fullscreen bug in GoogleMapsOverlay (#3255)
+- Fix missing brace on link in viewport doc
+- [Bug] Fix H3HexagonLayer state update (#3246)
+
+#### deck.gl [v7.1.4] - June 13 2019
+
+- CompositeLayer: add ability to override sublayer updateTriggers (#3234)
+- Add touchAction prop to Deck (#3231)
+
+#### deck.gl [v7.1.3] - June 10 2019
+
+- H3Hexagon: add support for coverage. (#3210)
+- fix react method binding (#3219)
+- Fix unpkg links in layer documentations (#3216)
+
+#### deck.gl [v7.1.2] - June 7 2019
+
+- Fix tree shaking in pre-bundled version (#3214)
+
+#### deck.gl [v7.1.1] - June 6 2019
+
+- Support 3D paths with TripsLayer (#3192)
+- fix path layer vertex shader (#3206)
+- Attribute buffer handling bug fixes (#3207)
+- Add sideEffects field to core package.json (#3202)
+
+#### deck.gl [v7.1.0] - June 5 2019
+
+- Fix ArcLayer bug when using non-iterable data with pre-allocated target array (#3170)
+- Fix BitmapLayer (#3181)
+- GPUGridLayer: make it exclusive for WebGL2 (#3195)
+
 ### deck.gl v7.1 Prereleases
+
+#### deck.gl [v7.1.0-beta.1] - May 31 2019
+
+- fix post-processing effect framebuffer binding bug (#3164)
+- bump lerna version (#3161)
+- Metrics-tracking Deck property (#3139)
+- Remove dead code from scenegraph-layer shader (#3167)
+- Support react-map-gl's new MapContext format (#3168)
+
+#### deck.gl [v7.1.0-alpha.2] - May 30 2019
+
+- fix normal projection (#3134)
+- GPUGridAggregator: Add `getData` method (#3110)
+- GPU GridLayer PART-4: Add support for picking (#3115)
+- H3HexagonLayer: fix render bug cross the 180th meridian (#3133)
+- support multiple ranges in attribute partial update (#3119)
+- Fix scenegraph-layer attribute issue with static scenegraph (#3135)
+- Support partial update in layer attribute updaters (#3122)
+- Handle partial update in Tesselator (#3121)
+- Add PBR & IBL lighting option to scenegraph-layer (#3116)
+- Fix ColumnGeometry normals calculation (#3145)
+- improve sun/shadow example to use effect rendering pipeline (#3142)
+- Add billboard mode to PathLayer (#3140)
+- Add h3 layer embedded demos (#3150)
+- Improve PathLayer precision (#3141)
+- GPU GridLayer PART 5: Add new color/elevation props to Grid and Hexagon layers (#3137)
+- GPU GridLyer Part 6: GPUGridLayer fixes and docs. (#3143)
+- Fix abnormal normals in scenegraph-layer-vertex shader (#3154)
+- GPU GridLayer Part 7: Rename NewGridLayer to GridLayer. (#3149)
+- GPU Aggregator : enable partial test (#3157)
+- Improve react module test coverage (#3155)
+- Bump luma.gl to v7.1.0-alpha.5
 
 #### deck.gl [v7.1.0-alpha.1] - May 22 2019
 

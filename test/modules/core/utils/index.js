@@ -20,11 +20,13 @@
 
 import './color.spec';
 import './deep-equal.spec';
-import './get.spec';
 import './flatten.spec';
 import './positions.spec';
 import './memoize.spec';
 import './array-utils.spec';
 import './iterable-utils.spec';
 import './range.spec';
+import './math-utils.spec';
+import './shader.spec';
+import './typed-array-manager.spec';
 // import './compare-objects.spec';

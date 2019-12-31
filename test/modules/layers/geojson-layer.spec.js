@@ -29,7 +29,7 @@ test('GeoJsonLayer#tests', t => {
   const testCases = generateLayerTests({
     Layer: GeoJsonLayer,
     sampleProps: {
-      data: FIXTURES.choropleths
+      data: FIXTURES.geojson
     },
     assert: t.ok,
     onBeforeUpdate: ({testCase}) => t.comment(testCase.title),
@@ -38,9 +38,33 @@ test('GeoJsonLayer#tests', t => {
       const hasData = layer.props && layer.props.data && Object.keys(layer.props.data).length;
       t.is(
         subLayers.length,
-        !hasData ? 0 : layer.props.stroked ? 2 : 1,
+        !hasData ? 0 : layer.props.stroked && !layer.props.extruded ? 4 : 3,
         'correct number of sublayers'
       );
+    }
+  });
+
+  // Add partial update test case
+  testCases.push({
+    title: 'GeoJsonLayer#',
+    onBeforeUpdate: ({testCase}) => t.comment(testCase.title),
+    onAfterUpdate: ({layer, subLayers}) => {
+      const {featuresDiff} = layer.state;
+      t.deepEquals(
+        featuresDiff,
+        {
+          polygonFeatures: [{startRow: 0, endRow: 3}],
+          polygonOutlineFeatures: [{startRow: 0, endRow: 3}],
+          lineFeatures: [{startRow: 0, endRow: 0}],
+          pointFeatures: [{startRow: 0, endRow: 0}]
+        },
+        'created diff for subLayers'
+      );
+      t.ok(subLayers.every(l => l.props._dataDiff), "sublayers' dataDiff prop is populated");
+    },
+    updateProps: {
+      data: Object.assign({}, FIXTURES.choropleths),
+      _dataDiff: () => [{startRow: 0, endRow: 3}]
     }
   });
 

@@ -24,8 +24,10 @@ export default `\
 attribute vec3 positions;
 attribute vec4 instanceSourceColors;
 attribute vec4 instanceTargetColors;
-attribute vec4 instancePositions;
-attribute vec4 instancePositions64Low;
+attribute vec3 instanceSourcePositions;
+attribute vec3 instanceSourcePositions64Low;
+attribute vec3 instanceTargetPositions;
+attribute vec3 instanceTargetPositions64Low;
 attribute vec3 instancePickingColors;
 attribute float instanceWidths;
 attribute float instanceHeights;
@@ -38,15 +40,27 @@ uniform float widthMinPixels;
 uniform float widthMaxPixels;
 
 varying vec4 vColor;
+varying vec2 uv;
 
-float paraboloid(vec2 source, vec2 target, float ratio) {
+float paraboloid(vec3 source, vec3 target, float ratio) {
+  // d: distance on the xy plane
+  // r: ratio of the current point
+  // p: ratio of the peak of the arc
+  // h: height multiplier
+  // z = f(r) = sqrt(r * (p * 2 - r)) * d * h
+  // f(0) = 0
+  // f(1) = dz
 
-  vec2 x = mix(source, target, ratio);
-  vec2 center = mix(source, target, 0.5);
+  vec3 delta = target - source;
+  float dh = length(delta.xy) * instanceHeights;
+  float unitZ = delta.z / dh;
+  float p2 = unitZ * unitZ + 1.0;
 
-  float dSourceCenter = distance(source, center);
-  float dXCenter = distance(x, center);
-  return (dSourceCenter + dXCenter) * (dSourceCenter - dXCenter);
+  // sqrt does not deal with negative values, manually flip source and target if delta.z < 0
+  float dir = step(delta.z, 0.0);
+  float z0 = mix(source.z, target.z, dir);
+  float r = mix(ratio, 1.0 - ratio, dir);
+  return sqrt(r * (p2 - r)) * dh + z0;
 }
 
 // offset vector by strokeWidth pixels
@@ -57,32 +71,32 @@ vec2 getExtrusionOffset(vec2 line_clipspace, float offset_direction, float width
   // rotate by 90 degrees
   dir_screenspace = vec2(-dir_screenspace.y, dir_screenspace.x);
 
-  vec2 offset_screenspace = dir_screenspace * offset_direction * width / 2.0;
-  vec2 offset_clipspace = project_pixel_size_to_clipspace(offset_screenspace);
-
-  return offset_clipspace;
+  return dir_screenspace * offset_direction * width / 2.0;
 }
 
 float getSegmentRatio(float index) {
   return smoothstep(0.0, 1.0, index / (numSegments - 1.0));
 }
 
-vec3 getPos(vec2 source, vec2 target, float segmentRatio) {
-  float vertexHeight = sqrt(max(0.0, paraboloid(source, target, segmentRatio))) * instanceHeights;
+vec3 getPos(vec3 source, vec3 target, float segmentRatio) {
+  float z = paraboloid(source, target, segmentRatio);
 
   float tiltAngle = radians(instanceTilts);
-  vec2 tiltDirection = normalize(target - source);
-  vec2 tilt = vec2(-tiltDirection.y, tiltDirection.x) * vertexHeight * sin(tiltAngle);
+  vec2 tiltDirection = normalize(target.xy - source.xy);
+  vec2 tilt = vec2(-tiltDirection.y, tiltDirection.x) * z * sin(tiltAngle);
 
   return vec3(
-    mix(source, target, segmentRatio) + tilt,
-    vertexHeight * cos(tiltAngle)
+    mix(source.xy, target.xy, segmentRatio) + tilt,
+    z * cos(tiltAngle)
   );
 }
 
 void main(void) {
-  vec2 source = project_position(vec3(instancePositions.xy, 0.0), instancePositions64Low.xy).xy;
-  vec2 target = project_position(vec3(instancePositions.zw, 0.0), instancePositions64Low.zw).xy;
+  geometry.worldPosition = instanceSourcePositions;
+  geometry.worldPositionAlt = instanceTargetPositions;
+
+  vec3 source = project_position(instanceSourcePositions, instanceSourcePositions64Low);
+  vec3 target = project_position(instanceTargetPositions, instanceTargetPositions64Low);
 
   float segmentIndex = positions.x;
   float segmentRatio = getSegmentRatio(segmentIndex);
@@ -95,6 +109,10 @@ void main(void) {
   vec3 nextPos = getPos(source, target, nextSegmentRatio);
   vec4 curr = project_common_position_to_clipspace(vec4(currPos, 1.0));
   vec4 next = project_common_position_to_clipspace(vec4(nextPos, 1.0));
+  geometry.position = vec4(currPos, 1.0);
+  uv = vec2(segmentRatio, positions.y);
+  geometry.uv = uv;
+  geometry.pickingColor = instancePickingColors;
 
   // Multiply out width and clamp to limits
   // mercator pixels are interpreted as screen pixels
@@ -104,13 +122,15 @@ void main(void) {
   );
 
   // extrude
-  vec2 offset = getExtrusionOffset((next.xy - curr.xy) * indexDir, positions.y, widthPixels);
-  gl_Position = curr + vec4(offset, 0.0, 0.0);
+  vec3 offset = vec3(
+    getExtrusionOffset((next.xy - curr.xy) * indexDir, positions.y, widthPixels),
+    0.0);
+  DECKGL_FILTER_SIZE(offset, geometry);
+  gl_Position = curr + vec4(project_pixel_size_to_clipspace(offset.xy), 0.0, 0.0);
+  DECKGL_FILTER_GL_POSITION(gl_Position, geometry);
 
-  vec4 color = mix(instanceSourceColors, instanceTargetColors, segmentRatio) / 255.;
+  vec4 color = mix(instanceSourceColors, instanceTargetColors, segmentRatio);
   vColor = vec4(color.rgb, color.a * opacity);
-
-  // Set color to be rendered to picking fbo (also used to check for selection highlight).
-  picking_setPickingColor(instancePickingColors);
+  DECKGL_FILTER_COLOR(vColor, geometry);
 }
 `;

@@ -22,11 +22,9 @@ import test from 'tape-catch';
 import * as FIXTURES from 'deck.gl-test/data';
 import {testLayer, generateLayerTests, testInitializeLayer} from '@deck.gl/test-utils';
 import {makeSpy} from '@probe.gl/test-utils';
-import {
-  _GPUGridLayer as GPUGridLayer,
-  _GPUGridAggregator as GPUGridAggregator
-} from '@deck.gl/aggregation-layers';
+import {GPUGridLayer} from '@deck.gl/aggregation-layers';
 import GPUGridCellLayer from '@deck.gl/aggregation-layers/gpu-grid-layer/gpu-grid-cell-layer';
+import {setupSpysForWebGL1, restoreSpies} from './webgl1-spies-utils';
 import {gl} from '@deck.gl/test-utils';
 
 const SAMPLE_PROPS = {
@@ -35,11 +33,7 @@ const SAMPLE_PROPS = {
 };
 
 test('GPUGridLayer', t => {
-  if (!GPUGridAggregator.isSupported(gl)) {
-    t.comment('GPUGridLayer not supported, skipping');
-    t.end();
-    return;
-  }
+  const webgl1Spies = setupSpysForWebGL1(gl);
   const testCases = generateLayerTests({
     Layer: GPUGridLayer,
     sampleProps: SAMPLE_PROPS,
@@ -52,17 +46,14 @@ test('GPUGridLayer', t => {
 
   testLayer({Layer: GPUGridLayer, testCases, onError: t.notOk});
 
+  restoreSpies(webgl1Spies);
   t.end();
 });
 
 test('GPUGridLayer#renderLayers', t => {
-  if (!GPUGridAggregator.isSupported(gl)) {
-    t.comment('GPUGridLayer not supported, skipping');
-    t.end();
-    return;
-  }
-  makeSpy(GPUGridLayer.prototype, 'getAggregationFlags');
-  makeSpy(GPUGridLayer.prototype, 'getLayerData');
+  const webgl1Spies = setupSpysForWebGL1(gl);
+
+  makeSpy(GPUGridLayer.prototype, '_updateAggregation');
 
   const layer = new GPUGridLayer(SAMPLE_PROPS);
 
@@ -74,20 +65,15 @@ test('GPUGridLayer#renderLayers', t => {
 
   t.ok(sublayer instanceof GPUGridCellLayer, 'Sublayer GPUGridCellLayer layer rendered');
 
-  t.ok(GPUGridLayer.prototype.getAggregationFlags.called, 'should call getAggregationFlags');
-  t.ok(GPUGridLayer.prototype.getLayerData.called, 'should call getLayerData');
-  GPUGridLayer.prototype.getAggregationFlags.restore();
-  GPUGridLayer.prototype.getLayerData.restore();
+  t.ok(GPUGridLayer.prototype._updateAggregation.called, 'should call _updateAggregation');
+  GPUGridLayer.prototype._updateAggregation.restore();
 
+  restoreSpies(webgl1Spies);
   t.end();
 });
 
 test('GPUGridLayer#updates', t => {
-  if (!GPUGridAggregator.isSupported(gl)) {
-    t.comment('GPUGridLayer not supported, skipping');
-    t.end();
-    return;
-  }
+  const webgl1Spies = setupSpysForWebGL1(gl);
   testLayer({
     Layer: GPUGridLayer,
     onError: t.notOk,
@@ -95,21 +81,10 @@ test('GPUGridLayer#updates', t => {
       {
         props: SAMPLE_PROPS,
         onAfterUpdate({layer}) {
-          const {weights, gridSize, gridOrigin, cellSize, boundingBox} = layer.state;
+          const {weights, numCol, numRow, boundingBox} = layer.state;
 
           t.ok(weights.color.aggregationBuffer, 'Data is aggregated');
-          t.ok(
-            Number.isFinite(gridSize[0]) && Number.isFinite(gridSize[1]),
-            'gridSize is calculated'
-          );
-          t.ok(
-            Number.isFinite(gridOrigin[0]) && Number.isFinite(gridOrigin[1]),
-            'gridOrigin is calculated'
-          );
-          t.ok(
-            Number.isFinite(cellSize[0]) && Number.isFinite(cellSize[1]),
-            'cellSize is calculated'
-          );
+          t.ok(numCol && numRow, 'gridSize is calculated');
           t.ok(
             Number.isFinite(boundingBox.xMin) && Number.isFinite(boundingBox.xMax),
             'boundingBox is calculated'
@@ -120,43 +95,38 @@ test('GPUGridLayer#updates', t => {
         updateProps: {
           colorRange: GPUGridLayer.defaultProps.colorRange.slice()
         },
-        spies: ['getAggregationFlags', 'getLayerData'],
+        spies: ['_updateAggregation'],
         onAfterUpdate({layer, subLayers, spies}) {
-          t.ok(spies.getAggregationFlags.called, 'should call getAggregationFlags');
-          t.notOk(spies.getLayerData.called, 'should not call getLayerData');
+          t.notOk(spies._updateAggregation.called, 'should not call _updateAggregation');
 
-          spies.getAggregationFlags.restore();
-          spies.getLayerData.restore();
+          spies._updateAggregation.restore();
         }
       },
       {
         updateProps: {
           cellSize: 10
         },
-        spies: ['getAggregationFlags', 'getLayerData'],
+        spies: ['_updateAggregation'],
         onAfterUpdate({layer, subLayers, spies}) {
-          t.ok(spies.getAggregationFlags.called, 'should call getAggregationFlags');
-          t.ok(spies.getLayerData.called, 'should call getLayerData');
+          t.ok(spies._updateAggregation.called, 'should call _updateAggregation');
 
-          spies.getAggregationFlags.restore();
-          spies.getLayerData.restore();
+          spies._updateAggregation.restore();
         }
       },
       {
         updateProps: {
-          colorAggregation: 3
+          colorAggregation: 'MAX'
         },
-        spies: ['getAggregationFlags', 'getLayerData'],
+        spies: ['_updateAggregation'],
         onAfterUpdate({layer, subLayers, spies}) {
-          t.ok(spies.getAggregationFlags.called, 'should call getAggregationFlags');
-          t.ok(spies.getLayerData.called, 'should call getLayerData');
+          t.ok(spies._updateAggregation.called, 'should call _updateAggregation');
 
-          spies.getAggregationFlags.restore();
-          spies.getLayerData.restore();
+          spies._updateAggregation.restore();
         }
       }
     ]
   });
 
+  restoreSpies(webgl1Spies);
   t.end();
 });

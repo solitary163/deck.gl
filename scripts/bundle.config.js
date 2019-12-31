@@ -18,7 +18,7 @@ function getExternals(packageInfo) {
   let externals = {
     // Hard coded externals
     'h3-js': 'h3',
-    's2-geometry': 'S2'
+    's2-geometry': 's2Geometry'
   };
   const {peerDependencies = {}} = packageInfo;
 
@@ -55,7 +55,8 @@ const config = {
   output: {
     libraryTarget: 'umd',
     path: PACKAGE_ROOT,
-    filename: 'dist.min.js'
+    filename: 'dist.min.js',
+    library: 'deck'
   },
 
   resolve: {
@@ -68,12 +69,16 @@ const config = {
         // Compile ES2015 using babel
         test: /\.js$/,
         loader: 'babel-loader',
-        include: /src/,
+        include: [/src/, /bundle/],
         options: {
           presets: [['@babel/preset-env', {forceAllTransforms: true}]],
           // all of the helpers will reference the module @babel/runtime to avoid duplication
           // across the compiled output.
-          plugins: ['@babel/transform-runtime']
+          plugins: [
+            '@babel/transform-runtime',
+            'inline-webgl-constants',
+            ['remove-glsl-comments', {patterns: ['**/*.glsl.js']}]
+          ]
         }
       }
     ]

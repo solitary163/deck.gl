@@ -19,6 +19,7 @@
 // THE SOFTWARE.
 
 import {createIterable} from '@deck.gl/core';
+import GL from '@luma.gl/constants';
 import IconLayer from '../../icon-layer/icon-layer';
 
 import vs from './multi-icon-layer-vertex.glsl';
@@ -29,8 +30,14 @@ const DEFAULT_GAMMA = 0.2;
 const DEFAULT_BUFFER = 192.0 / 256;
 
 const defaultProps = {
-  getShiftInQueue: {type: 'accessor', value: x => x.shift || 0},
-  getLengthOfQueue: {type: 'accessor', value: x => x.len || 1},
+  backgroundColor: {type: 'color', value: null, optional: true},
+  // each paragraph can have one or multiple row(s)
+  // each row can have one or multiple character(s)
+  getRowSize: {type: 'accessor', value: x => x.rowSize || [0, 0]},
+  // offset from the left, top position of the paragraph
+  getOffsets: {type: 'accessor', value: x => x.offsets || [0, 0]},
+  // [width, height] of the paragraph
+  getParagraphSize: {type: 'accessor', value: x => x.size || [1, 1]},
   // 1: left, 0: middle, -1: right
   getAnchorX: {type: 'accessor', value: x => x.anchorX || 0},
   // 1: top, 0: center, -1: bottom
@@ -54,17 +61,27 @@ export default class MultiIconLayer extends IconLayer {
 
     const attributeManager = this.getAttributeManager();
     attributeManager.addInstanced({
+      instanceOffsets: {
+        size: 2,
+        accessor: ['getIcon', 'getAnchorX', 'getAnchorY'],
+        update: this.calculateInstanceOffsets
+      },
       instancePixelOffset: {
         size: 2,
         transition: true,
         accessor: 'getPixelOffset'
+      },
+      instancePickingColors: {
+        type: GL.UNSIGNED_BYTE,
+        size: 3,
+        update: this.calculateInstancePickingColors
       }
     });
   }
 
   updateState(updateParams) {
     super.updateState(updateParams);
-    const {changeFlags} = updateParams;
+    const {changeFlags, oldProps, props} = updateParams;
 
     if (
       changeFlags.updateTriggersChanged &&
@@ -72,17 +89,29 @@ export default class MultiIconLayer extends IconLayer {
     ) {
       this.getAttributeManager().invalidate('instanceOffsets');
     }
+
+    if (props.backgroundColor !== oldProps.backgroundColor) {
+      const backgroundColor = Array.isArray(props.backgroundColor)
+        ? props.backgroundColor.map(c => c / 255.0).slice(0, 3)
+        : null;
+      this.setState({backgroundColor});
+    }
   }
 
   draw({uniforms}) {
     const {sdf} = this.props;
+    const {backgroundColor} = this.state;
+    const shouldDrawBackground = Array.isArray(backgroundColor);
+
     super.draw({
       uniforms: Object.assign({}, uniforms, {
         // Refer the following doc about gamma and buffer
         // https://blog.mapbox.com/drawing-text-with-signed-distance-fields-in-mapbox-gl-b0933af6f817
         buffer: DEFAULT_BUFFER,
         gamma: DEFAULT_GAMMA,
-        sdf: Boolean(sdf)
+        sdf: Boolean(sdf),
+        backgroundColor: backgroundColor || [0, 0, 0],
+        shouldDrawBackground
       })
     });
   }
@@ -94,8 +123,9 @@ export default class MultiIconLayer extends IconLayer {
       getIcon,
       getAnchorX,
       getAnchorY,
-      getLengthOfQueue,
-      getShiftInQueue
+      getParagraphSize,
+      getRowSize,
+      getOffsets
     } = this.props;
     const {value, size} = attribute;
     let i = startRow * size;
@@ -104,11 +134,17 @@ export default class MultiIconLayer extends IconLayer {
     for (const object of iterable) {
       const icon = getIcon(object);
       const rect = iconMapping[icon] || {};
-      const len = getLengthOfQueue(object);
-      const shiftX = getShiftInQueue(object);
+      const [width, height] = getParagraphSize(object);
+      const [rowWidth] = getRowSize(object);
+      const [offsetX, offsetY] = getOffsets(object);
+      const anchorX = getAnchorX(object);
+      const anchorY = getAnchorY(object);
 
-      value[i++] = ((getAnchorX(object) - 1) * len) / 2 + rect.width / 2 + shiftX || 0;
-      value[i++] = (rect.height / 2) * getAnchorY(object) || 0;
+      // For a multi-line object, offset in x-direction needs consider
+      // the row offset in the paragraph and the object offset in the row
+      const rowOffset = ((1 - anchorX) * (width - rowWidth)) / 2;
+      value[i++] = ((anchorX - 1) * width) / 2 + rowOffset + rect.width / 2 + offsetX || 0;
+      value[i++] = ((anchorY - 1) * height) / 2 + rect.height / 2 + offsetY || 0;
     }
   }
 

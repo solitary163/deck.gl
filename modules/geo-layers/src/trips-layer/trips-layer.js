@@ -22,25 +22,23 @@ import {PathLayer} from '@deck.gl/layers';
 
 const defaultProps = {
   trailLength: {type: 'number', value: 120, min: 0},
-  currentTime: {type: 'number', value: 0, min: 0}
+  currentTime: {type: 'number', value: 0, min: 0},
+  getTimestamps: {type: 'accessor', value: null}
 };
 
 export default class TripsLayer extends PathLayer {
   getShaders() {
     const shaders = super.getShaders();
     shaders.inject = {
-      // Timestamp of the vertex
       'vs:#decl': `\
 uniform float trailLength;
+attribute float instanceTimestamps;
+attribute float instanceNextTimestamps;
 varying float vTime;
 `,
-      // Remove the z component (timestamp) from position
-      'vec3 pos = lineJoin(prevPosition, currPosition, nextPosition);': 'pos.z = 0.0;',
-      // Apply a small shift to battle z-fighting
+      // Timestamp of the vertex
       'vs:#main-end': `\
-float shiftZ = mod(instanceEndPositions.z, trailLength) * 1e-4;
-gl_Position.z += shiftZ;
-vTime = instanceStartPositions.z + (instanceEndPositions.z - instanceStartPositions.z) * vPathPosition.y / vPathLength;
+vTime = instanceTimestamps + (instanceNextTimestamps - instanceTimestamps) * vPathPosition.y / vPathLength;
 `,
       'fs:#decl': `\
 uniform float trailLength;
@@ -54,9 +52,29 @@ if(vTime > currentTime || vTime < currentTime - trailLength) {
 }
 `,
       // Fade the color (currentTime - 100%, end of trail - 0%)
-      'gl_FragColor = vColor;': 'gl_FragColor.a *= 1.0 - (currentTime - vTime) / trailLength;'
+      'fs:DECKGL_FILTER_COLOR': 'color.a *= 1.0 - (currentTime - vTime) / trailLength;'
     };
     return shaders;
+  }
+
+  initializeState(params) {
+    super.initializeState(params);
+
+    const attributeManager = this.getAttributeManager();
+    attributeManager.addInstanced({
+      timestamps: {
+        size: 1,
+        accessor: 'getTimestamps',
+        shaderAttributes: {
+          instanceTimestamps: {
+            vertexOffset: 0
+          },
+          instanceNextTimestamps: {
+            vertexOffset: 1
+          }
+        }
+      }
+    });
   }
 
   draw(params) {

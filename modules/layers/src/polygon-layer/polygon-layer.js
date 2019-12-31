@@ -18,15 +18,14 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
-import {PhongMaterial} from '@luma.gl/core';
-import {CompositeLayer, createIterable} from '@deck.gl/core';
+import {CompositeLayer, createIterable, log} from '@deck.gl/core';
 import SolidPolygonLayer from '../solid-polygon-layer/solid-polygon-layer';
 import PathLayer from '../path-layer/path-layer';
 import * as Polygon from '../solid-polygon-layer/polygon';
+import {replaceInRange} from '../utils';
 
 const defaultLineColor = [0, 0, 0, 255];
 const defaultFillColor = [0, 0, 0, 255];
-const defaultMaterial = new PhongMaterial();
 
 const defaultProps = {
   stroked: true,
@@ -34,6 +33,7 @@ const defaultProps = {
   extruded: false,
   elevationScale: 1,
   wireframe: false,
+  _normalize: true,
 
   lineWidthUnits: 'meters',
   lineWidthScale: 1,
@@ -41,8 +41,6 @@ const defaultProps = {
   lineWidthMaxPixels: Number.MAX_SAFE_INTEGER,
   lineJointRounded: false,
   lineMiterLimit: 4,
-  lineDashJustified: false,
-  fp64: false,
 
   getPolygon: {type: 'accessor', value: f => f.polygon},
   // Polygon fill color
@@ -51,13 +49,11 @@ const defaultProps = {
   getLineColor: {type: 'accessor', value: defaultLineColor},
   // Line and polygon outline accessors
   getLineWidth: {type: 'accessor', value: 1},
-  // Line dash array accessor
-  getLineDashArray: {type: 'accessor', value: [0, 0]},
   // Polygon extrusion accessor
   getElevation: {type: 'accessor', value: 1000},
 
   // Optional material for 'lighting' shader module
-  material: defaultMaterial
+  material: true
 };
 
 export default class PolygonLayer extends CompositeLayer {
@@ -65,6 +61,10 @@ export default class PolygonLayer extends CompositeLayer {
     this.state = {
       paths: []
     };
+
+    if (this.props.getLineDashArray) {
+      log.removed('getLineDashArray', 'PathStyleExtension')();
+    }
   }
 
   updateState({oldProps, props, changeFlags}) {
@@ -73,29 +73,40 @@ export default class PolygonLayer extends CompositeLayer {
       (changeFlags.updateTriggersChanged &&
         (changeFlags.updateTriggersChanged.all || changeFlags.updateTriggersChanged.getPolygon));
 
-    if (geometryChanged) {
-      this.state.paths = this._getPaths(props);
+    if (geometryChanged && Array.isArray(changeFlags.dataChanged)) {
+      const paths = this.state.paths.slice();
+      const pathsDiff = changeFlags.dataChanged.map(dataRange =>
+        replaceInRange({
+          data: paths,
+          getIndex: p => p.__source.index,
+          dataRange,
+          replace: this._getPaths(dataRange)
+        })
+      );
+      this.setState({paths, pathsDiff});
+    } else if (geometryChanged) {
+      this.setState({
+        paths: this._getPaths(),
+        pathsDiff: null
+      });
     }
   }
 
-  getPickingInfo({info}) {
-    return Object.assign(info, {
-      // override object with picked data
-      object: (info.object && info.object.object) || info.object
-    });
-  }
-
-  _getPaths({data, getPolygon, positionFormat}) {
+  _getPaths(dataRange = {}) {
+    const {data, getPolygon, positionFormat, _normalize} = this.props;
     const paths = [];
     const positionSize = positionFormat === 'XY' ? 2 : 3;
+    const {startRow, endRow} = dataRange;
 
-    const {iterable, objectInfo} = createIterable(data);
+    const {iterable, objectInfo} = createIterable(data, startRow, endRow);
     for (const object of iterable) {
       objectInfo.index++;
-      const {positions, holeIndices} = Polygon.normalize(
-        getPolygon(object, objectInfo),
-        positionSize
-      );
+      let polygon = getPolygon(object, objectInfo);
+      if (_normalize) {
+        polygon = Polygon.normalize(polygon, positionSize);
+      }
+      const {holeIndices} = polygon;
+      const positions = polygon.positions || polygon;
 
       if (holeIndices) {
         // split the positions array into `holeIndices.length + 1` rings
@@ -106,26 +117,30 @@ export default class PolygonLayer extends CompositeLayer {
             holeIndices[i - 1] || 0,
             holeIndices[i] || positions.length
           );
-          paths.push({path, object});
+          paths.push(this.getSubLayerRow({path}, object, objectInfo.index));
         }
       } else {
-        paths.push({path: positions, object});
+        paths.push(this.getSubLayerRow({path: positions}, object, objectInfo.index));
       }
     }
     return paths;
   }
 
-  _getAccessor(accessor) {
-    if (typeof accessor === 'function') {
-      return x => accessor(x.object);
-    }
-    return accessor;
-  }
-
   /* eslint-disable complexity */
   renderLayers() {
     // Layer composition props
-    const {data, stroked, filled, extruded, wireframe, elevationScale, transitions} = this.props;
+    const {
+      data,
+      _dataDiff,
+      stroked,
+      filled,
+      extruded,
+      wireframe,
+      _normalize,
+      elevationScale,
+      transitions,
+      positionFormat
+    } = this.props;
 
     // Rendering props underlying layer
     const {
@@ -135,8 +150,7 @@ export default class PolygonLayer extends CompositeLayer {
       lineWidthMaxPixels,
       lineJointRounded,
       lineMiterLimit,
-      lineDashJustified,
-      fp64
+      lineDashJustified
     } = this.props;
 
     // Accessor props for underlying layers
@@ -151,7 +165,7 @@ export default class PolygonLayer extends CompositeLayer {
       material
     } = this.props;
 
-    const {paths} = this.state;
+    const {paths, pathsDiff} = this.state;
 
     const FillLayer = this.getSubLayerClass('fill', SolidPolygonLayer);
     const StrokeLayer = this.getSubLayerClass('stroke', PathLayer);
@@ -161,12 +175,13 @@ export default class PolygonLayer extends CompositeLayer {
       this.shouldRenderSubLayer('fill', paths) &&
       new FillLayer(
         {
+          _dataDiff,
           extruded,
           elevationScale,
 
-          fp64,
           filled,
           wireframe,
+          _normalize,
 
           getElevation,
           getFillColor,
@@ -186,6 +201,7 @@ export default class PolygonLayer extends CompositeLayer {
         }),
         {
           data,
+          positionFormat,
           getPolygon
         }
       );
@@ -197,7 +213,7 @@ export default class PolygonLayer extends CompositeLayer {
       this.shouldRenderSubLayer('stroke', paths) &&
       new StrokeLayer(
         {
-          fp64,
+          _dataDiff: pathsDiff && (() => pathsDiff),
           widthUnits: lineWidthUnits,
           widthScale: lineWidthScale,
           widthMinPixels: lineWidthMinPixels,
@@ -206,15 +222,18 @@ export default class PolygonLayer extends CompositeLayer {
           miterLimit: lineMiterLimit,
           dashJustified: lineDashJustified,
 
+          // Already normalized
+          _pathType: 'loop',
+
           transitions: transitions && {
             getWidth: transitions.getLineWidth,
             getColor: transitions.getLineColor,
             getPath: transitions.getPolygon
           },
 
-          getColor: this._getAccessor(getLineColor),
-          getWidth: this._getAccessor(getLineWidth),
-          getDashArray: this._getAccessor(getLineDashArray)
+          getColor: this.getSubLayerAccessor(getLineColor),
+          getWidth: this.getSubLayerAccessor(getLineWidth),
+          getDashArray: this.getSubLayerAccessor(getLineDashArray)
         },
         this.getSubLayerProps({
           id: 'stroke',
@@ -226,6 +245,7 @@ export default class PolygonLayer extends CompositeLayer {
         }),
         {
           data: paths,
+          positionFormat,
           getPath: x => x.path
         }
       );

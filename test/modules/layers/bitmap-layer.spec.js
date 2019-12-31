@@ -3,7 +3,7 @@ import test from 'tape-catch';
 import {BitmapLayer} from '@deck.gl/layers';
 import {testLayer} from '@deck.gl/test-utils';
 
-test.skip('BitmapLayer#constructor', t => {
+test('BitmapLayer#constructor', t => {
   const positionsWithZ = new Float32Array([2, 4, 1, 2, 8, 1, 16, 8, 1, 16, 4, 1]);
   const positions = new Float32Array([2, 4, 0, 2, 8, 0, 16, 8, 0, 16, 4, 0]);
 
@@ -30,10 +30,6 @@ test.skip('BitmapLayer#constructor', t => {
             positionsWithZ,
             'should update positions'
           );
-          t.ok(
-            layer.getAttributeManager().attributes.positions64xyLow,
-            'should add positions64xyLow'
-          );
         }
       },
       {
@@ -46,10 +42,6 @@ test.skip('BitmapLayer#constructor', t => {
             layer.getAttributeManager().attributes.positions.value,
             positions,
             'should update positions'
-          );
-          t.ok(
-            layer.getAttributeManager().attributes.positions64xyLow,
-            'should add positions64xyLow'
           );
         }
       }

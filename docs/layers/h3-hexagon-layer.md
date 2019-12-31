@@ -1,6 +1,7 @@
+<!-- INJECT:"H3HexagonLayerDemo" -->
+
 <p class="badges">
   <img src="https://img.shields.io/badge/@deck.gl/geo--layers-lightgrey.svg?style=flat-square" alt="@deck.gl/geo-layers" />
-  <img src="https://img.shields.io/badge/fp64-yes-blue.svg?style=flat-square" alt="64-bit" />
   <img src="https://img.shields.io/badge/lighting-yes-blue.svg?style=flat-square" alt="lighting" />
 </p>
 
@@ -20,8 +21,8 @@ const App = ({data, viewport}) => {
    * Data format:
    * [
    *   {
-   *     hexagonId: '882830829bfffff',
-   *     eventCount: 14030
+   *     hex: '88283082b9fffff',
+   *     count: 96
    *   },
    *   ...
    * ]
@@ -29,13 +30,16 @@ const App = ({data, viewport}) => {
   const layer = new H3HexagonLayer({
     id: 'h3-hexagon-layer',
     data,
-    extruded: true,
     pickable: true,
-    getHexagon: d => d.hexagonId,
-    getElevation: d => d.eventCount / 3,
-    getColor: d => [255, (1 - d.eventCount / 20000) * 255, 0],
+    wireframe: false,
+    filled: true,
+    extruded: true,
+    elevationScale: 20,
+    getHexagon: d => d.hex,
+    getFillColor: d => [255, (1 - d.count / 500) * 255, 0],
+    getElevation: d => d.count,
     onHover: ({object, x, y}) => {
-      const tooltip = `${object.hexagonId}\nEvents: ${object.eventCount}`;
+      const tooltip = `${object.hex} count: ${object.count}`;
       /* Update tooltip
          http://deck.gl/#/documentation/developer-guide/adding-interactivity?section=example-display-a-tooltip-for-hovered-object
       */
@@ -66,11 +70,11 @@ To use pre-bundled scripts:
 
 ```html
 <script src="https://unpkg.com/h3-js"></script>
-<script src="https://unpkg.com/@deck.gl@~7.0.0/dist.min.js"></script>
+<script src="https://unpkg.com/deck.gl@^8.0.0/dist.min.js"></script>
 <!-- or -->
-<script src="https://unpkg.com/@deck.gl/core@~7.0.0/dist.min.js"></script>
-<script src="https://unpkg.com/@deck.gl/layers@~7.0.0/dist.min.js"></script>
-<script src="https://unpkg.com/@deck.gl/geo-layers@~7.0.0/dist.min.js"></script>
+<script src="https://unpkg.com/@deck.gl/core@^8.0.0/dist.min.js"></script>
+<script src="https://unpkg.com/@deck.gl/layers@^8.0.0/dist.min.js"></script>
+<script src="https://unpkg.com/@deck.gl/geo-layers@^8.0.0/dist.min.js"></script>
 ```
 
 ```js
@@ -97,6 +101,13 @@ However, there are 12 pentagons world wide at each resolution. The hexagons at a
 * if `false`, the layer chooses the mode automatically. High-precision rendering is only used if resolution is at or below `5`, or if a pentagon is found in the data.
 * if `true`, always use high-precision rendering.
 
+##### `coverage` (Number, optional) ![transition-enabled](https://img.shields.io/badge/transition-enabled-green.svg?style=flat-square")
+
+* Default: `1`
+
+Hexagon radius multiplier, between 0 - 1. When `coverage` = 1, hexagon is rendered with actual size, by specifying a different value (between 0 and 1) hexagon can be scaled down.
+
+
 ### Data Accessors
 
 ##### `getHexagon` ([Function](/docs/developer-guide/using-layers.md#accessors), optional)
@@ -118,4 +129,3 @@ The `H3HexagonLayer` renders the following sublayers:
 ## Source
 
 [modules/geo-layers/src/h3-layers/h3-hexagon-layer](https://github.com/uber/deck.gl/tree/master/modules/geo-layers/src/h3-layers/h3-hexagon-layer.js)
-

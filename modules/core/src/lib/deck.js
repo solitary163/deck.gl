@@ -25,16 +25,25 @@ import EffectManager from './effect-manager';
 import Effect from './effect';
 import DeckRenderer from './deck-renderer';
 import DeckPicker from './deck-picker';
+import Tooltip from './tooltip';
 import log from '../utils/log';
+import deckGlobal from './init';
 
 import GL from '@luma.gl/constants';
-import {AnimationLoop, createGLContext, trackContextState, setParameters} from '@luma.gl/core';
+import {
+  AnimationLoop,
+  createGLContext,
+  instrumentGLContext,
+  setParameters,
+  Timeline,
+  lumaStats
+} from '@luma.gl/core';
 import {Stats} from 'probe.gl';
 import {EventManager} from 'mjolnir.js';
 
 import assert from '../utils/assert';
 import {EVENTS} from './constants';
-/* global document */
+/* global window, document */
 
 function noop() {}
 
@@ -60,7 +69,8 @@ function getPropTypes(PropTypes) {
     glOptions: PropTypes.object,
     parameters: PropTypes.object,
     pickingRadius: PropTypes.number,
-    useDevicePixels: PropTypes.bool,
+    useDevicePixels: PropTypes.oneOfType([PropTypes.bool, PropTypes.number]),
+    touchAction: PropTypes.string,
 
     // Callbacks
     onWebGLInitialized: PropTypes.func,
@@ -75,7 +85,7 @@ function getPropTypes(PropTypes) {
     drawPickingColors: PropTypes.bool,
 
     // Experimental props
-
+    _framebuffer: PropTypes.object,
     // Forces a redraw every animation frame
     _animate: PropTypes.bool
   };
@@ -95,6 +105,8 @@ const defaultProps = {
   views: null,
   controller: null, // Rely on external controller, e.g. react-map-gl
   useDevicePixels: true,
+  touchAction: 'none',
+  _framebuffer: null,
   _animate: false,
 
   onWebGLInitialized: noop,
@@ -141,12 +153,15 @@ export default class Deck {
     this._onEvent = this._onEvent.bind(this);
     this._onPointerDown = this._onPointerDown.bind(this);
     this._onPointerMove = this._onPointerMove.bind(this);
-    this._onPointerLeave = this._onPointerLeave.bind(this);
     this._pickAndCallback = this._pickAndCallback.bind(this);
     this._onRendererInitialized = this._onRendererInitialized.bind(this);
     this._onRenderFrame = this._onRenderFrame.bind(this);
     this._onViewStateChange = this._onViewStateChange.bind(this);
     this._onInteractiveStateChange = this._onInteractiveStateChange.bind(this);
+
+    if (isIE11()) {
+      log.warn('IE 11 support will be deprecated in v8.0')();
+    }
 
     if (!props.gl) {
       // Note: LayerManager creation deferred until gl context available
@@ -157,6 +172,23 @@ export default class Deck {
     this.animationLoop = this._createAnimationLoop(props);
 
     this.stats = new Stats({id: 'deck.gl'});
+    this.metrics = {
+      fps: 0,
+      setPropsTime: 0,
+      updateAttributesTime: 0,
+      framesRedrawn: 0,
+      pickTime: 0,
+      pickCount: 0,
+      gpuTime: 0,
+      gpuTimePerFrame: 0,
+      cpuTime: 0,
+      cpuTimePerFrame: 0,
+      bufferMemory: 0,
+      textureMemory: 0,
+      renderbufferMemory: 0,
+      gpuMemory: 0
+    };
+    this._metricsCounter = 0;
 
     this.setProps(props);
 
@@ -188,8 +220,18 @@ export default class Deck {
       this.deckRenderer = null;
     }
 
+    if (this.deckPicker) {
+      this.deckPicker.finalize();
+      this.deckPicker = null;
+    }
+
     if (this.eventManager) {
       this.eventManager.destroy();
+    }
+
+    if (this.tooltip) {
+      this.tooltip.remove();
+      this.tooltip = null;
     }
 
     if (!this.props.canvas && !this.props.gl && this.canvas) {
@@ -315,60 +357,46 @@ export default class Deck {
     return this.viewManager.getViewports(rect);
   }
 
-  pickObject({x, y, radius = 0, layerIds = null}) {
-    this.stats.get('pickObject Time').timeStart();
-    const layers = this.layerManager.getLayers({layerIds});
-    const activateViewport = this.layerManager.activateViewport;
-    const selectedInfos = this.deckPicker.pickObject({
-      x,
-      y,
-      radius,
-      layers,
-      viewports: this.getViewports({x, y}),
-      activateViewport,
-      mode: 'query',
-      depth: 1
-    }).result;
-    this.stats.get('pickObject Time').timeEnd();
-    return selectedInfos.length ? selectedInfos[0] : null;
+  /* {x, y, radius = 0, layerIds = null, unproject3D} */
+  pickObject(opts) {
+    const infos = this._pick('pickObject', 'pickObject Time', opts).result;
+    return infos.length ? infos[0] : null;
   }
 
-  pickMultipleObjects({x, y, radius = 0, layerIds = null, depth = 10}) {
-    this.stats.get('pickMultipleObjects Time').timeStart();
-    const layers = this.layerManager.getLayers({layerIds});
-    const activateViewport = this.layerManager.activateViewport;
-    const selectedInfos = this.deckPicker.pickObject({
-      x,
-      y,
-      radius,
-      layers,
-      viewports: this.getViewports({x, y}),
-      activateViewport,
-      mode: 'query',
-      depth
-    }).result;
-    this.stats.get('pickMultipleObjects Time').timeEnd();
-    return selectedInfos;
+  /* {x, y, radius = 0, layerIds = null, unproject3D, depth = 10} */
+  pickMultipleObjects(opts) {
+    opts.depth = opts.depth || 10;
+    return this._pick('pickObject', 'pickMultipleObjects Time', opts).result;
   }
 
-  pickObjects({x, y, width = 1, height = 1, layerIds = null}) {
-    this.stats.get('pickObjects Time').timeStart();
-    const layers = this.layerManager.getLayers({layerIds});
-    const activateViewport = this.layerManager.activateViewport;
-    const infos = this.deckPicker.pickObjects({
-      x,
-      y,
-      width,
-      height,
-      layers,
-      viewports: this.getViewports({x, y, width, height}),
-      activateViewport
-    });
-    this.stats.get('pickObjects Time').timeEnd();
-    return infos;
+  /* {x, y, width = 1, height = 1, layerIds = null} */
+  pickObjects(opts) {
+    return this._pick('pickObjects', 'pickObjects Time', opts);
   }
 
   // Private Methods
+
+  _pick(method, statKey, opts) {
+    const {stats} = this;
+
+    stats.get('Pick Count').incrementCount();
+    stats.get(statKey).timeStart();
+
+    const infos = this.deckPicker[method](
+      Object.assign(
+        {
+          layers: this.layerManager.getLayers(opts),
+          viewports: this.getViewports(opts),
+          onViewportActive: this.layerManager.activateViewport
+        },
+        opts
+      )
+    );
+
+    stats.get(statKey).timeEnd();
+
+    return infos;
+  }
 
   // canvas, either string, canvas or `null`
   _createCanvas(props) {
@@ -376,7 +404,6 @@ export default class Deck {
 
     // TODO EventManager should accept element id
     if (typeof canvas === 'string') {
-      /* global document */
       canvas = document.getElementById(canvas);
       assert(canvas);
     }
@@ -448,6 +475,7 @@ export default class Deck {
       height,
       useDevicePixels,
       autoResizeDrawingBuffer,
+      autoResizeViewport: false,
       gl,
       onCreateContext: opts =>
         createGLContext(Object.assign({}, glOptions, opts, {canvas: this.canvas, debug})),
@@ -479,12 +507,15 @@ export default class Deck {
   // The `pointermove` event may fire multiple times in between two animation frames,
   // it's a waste of time to run picking without rerender. Instead we save the last pick
   // request and only do it once on the next animation frame.
-  _requestPick({event, callback, mode}) {
+  _onPointerMove(event) {
     const {_pickRequest} = this;
     if (event.type === 'pointerleave') {
       _pickRequest.x = -1;
       _pickRequest.y = -1;
       _pickRequest.radius = 0;
+    } else if (event.leftButton || event.rightButton) {
+      // Do not trigger onHover callbacks if mouse button is down.
+      return;
     } else {
       const pos = event.offsetCenter;
       // Do not trigger callbacks when click/hover position is invalid. Doing so will cause a
@@ -497,9 +528,13 @@ export default class Deck {
       _pickRequest.radius = this.props.pickingRadius;
     }
 
-    _pickRequest.callback = callback;
+    if (this.layerManager) {
+      this.layerManager.context.mousePosition = {x: _pickRequest.x, y: _pickRequest.y};
+    }
+
+    _pickRequest.callback = this.props.onHover;
     _pickRequest.event = event;
-    _pickRequest.mode = mode;
+    _pickRequest.mode = 'hover';
   }
 
   // Actually run picking
@@ -508,19 +543,14 @@ export default class Deck {
 
     if (_pickRequest.mode) {
       // perform picking
-      const {result, emptyInfo} = this.deckPicker.pickObject(
-        Object.assign(
-          {
-            layers: this.layerManager.getLayers(),
-            viewports: this.getViewports(_pickRequest),
-            activateViewport: this.layerManager.activateViewport,
-            depth: 1
-          },
-          _pickRequest
-        )
-      );
-      if (_pickRequest.callback) {
-        const pickedInfo = result.find(info => info.index >= 0) || emptyInfo;
+      const {result, emptyInfo} = this._pick('pickObject', 'pickObject Time', _pickRequest);
+      const shouldGenerateInfo = _pickRequest.callback || this.props.getTooltip;
+      const pickedInfo = shouldGenerateInfo && (result.find(info => info.index >= 0) || emptyInfo);
+      if (this.props.getTooltip) {
+        const displayInfo = this.props.getTooltip(pickedInfo);
+        this.tooltip.setTooltip(displayInfo, pickedInfo.x, pickedInfo.y);
+      }
+      if (_pickRequest.callback && !pickedInfo.handled) {
         _pickRequest.callback(pickedInfo, _pickRequest.event);
       }
       _pickRequest.mode = null;
@@ -533,11 +563,6 @@ export default class Deck {
     }
   }
 
-  // Updates animation props on the layer context
-  _updateAnimationProps(animationProps) {
-    this.layerManager.context.animationProps = animationProps;
-  }
-
   _setGLContext(gl) {
     if (this.layerManager) {
       return;
@@ -546,8 +571,10 @@ export default class Deck {
     // if external context...
     if (!this.canvas) {
       this.canvas = gl.canvas;
-      trackContextState(gl, {enable: true, copyState: true});
+      instrumentGLContext(gl, {enable: true, copyState: true});
     }
+
+    this.tooltip = new Tooltip(this.canvas);
 
     setParameters(gl, {
       blend: true,
@@ -559,11 +586,17 @@ export default class Deck {
 
     this.props.onWebGLInitialized(gl);
 
-    this.eventManager = new EventManager(gl.canvas, {
+    // timeline for transitions
+    const timeline = new Timeline();
+    timeline.play();
+    this.animationLoop.attachTimeline(timeline);
+
+    this.eventManager = new EventManager(this.props.parent || gl.canvas, {
+      touchAction: this.props.touchAction,
       events: {
         pointerdown: this._onPointerDown,
         pointermove: this._onPointerMove,
-        pointerleave: this._onPointerLeave
+        pointerleave: this._onPointerMove
       }
     });
     for (const eventType in EVENTS) {
@@ -571,6 +604,7 @@ export default class Deck {
     }
 
     this.viewManager = new ViewManager({
+      timeline,
       eventManager: this.eventManager,
       onViewStateChange: this._onViewStateChange,
       onInteractiveStateChange: this._onInteractiveStateChange,
@@ -582,13 +616,14 @@ export default class Deck {
 
     // viewManager must be initialized before layerManager
     // layerManager depends on viewport created by viewManager.
-    assert(this.viewManager);
     const viewport = this.viewManager.getViewports()[0];
+
     // Note: avoid React setState due GL animation loop / setState timing issue
     this.layerManager = new LayerManager(gl, {
       deck: this,
       stats: this.stats,
-      viewport
+      viewport,
+      timeline
     });
 
     this.effectManager = new EffectManager();
@@ -610,15 +645,13 @@ export default class Deck {
 
     this.props.onBeforeRender({gl});
 
-    const layers = this.layerManager.getLayers();
-    const activateViewport = this.layerManager.activateViewport;
-
     this.deckRenderer.renderLayers(
       Object.assign(
         {
-          layers,
+          target: this.props._framebuffer,
+          layers: this.layerManager.getLayers(),
           viewports: this.viewManager.getViewports(),
-          activateViewport,
+          onViewportActive: this.layerManager.activateViewport,
           views: this.viewManager.getViews(),
           pass: 'screen',
           redrawReason,
@@ -638,26 +671,17 @@ export default class Deck {
   }
 
   _onRenderFrame(animationProps) {
-    this.stats.get('frameRate').timeEnd();
-    this.stats.get('frameRate').timeStart();
+    this._getFrameStats();
 
     // Log perf stats every second
-    if (animationProps.tick % 60 === 0) {
-      const table = {};
-      this.stats.forEach(stat => {
-        table[stat.name] = {
-          time: stat.time || 0,
-          count: stat.count || 0,
-          average: stat.getAverageTime() || 0,
-          hz: stat.getHz() || 0
-        };
-      });
+    if (this._metricsCounter++ % 60 === 0) {
+      this._getMetrics();
       this.stats.reset();
-      log.table(3, table)();
+      log.table(4, this.metrics)();
 
       // Experimental: report metrics
       if (this.props._onMetrics) {
-        this.props._onMetrics(table);
+        this.props._onMetrics(this.metrics);
       }
     }
 
@@ -667,10 +691,7 @@ export default class Deck {
 
     // Update layers if needed (e.g. some async prop has loaded)
     // Note: This can trigger a redraw
-    this.layerManager.updateLayers(animationProps);
-
-    // Needs to be done before drawing
-    this._updateAnimationProps(animationProps);
+    this.layerManager.updateLayers();
 
     // Perform picking request if any
     this._pickAndCallback();
@@ -682,7 +703,7 @@ export default class Deck {
     // Note: this can trigger `onViewStateChange`, and affect layers
     // We want to defer these changes to the next frame
     if (this.viewManager) {
-      this.viewManager.updateViewStates(animationProps);
+      this.viewManager.updateViewStates();
     }
   }
 
@@ -694,8 +715,11 @@ export default class Deck {
 
     // If initialViewState was set on creation, auto track position
     if (this.viewState) {
-      this.viewState[params.viewId] = viewState;
-      this.viewManager.setProps({viewState});
+      this.viewState = {...this.viewState, [params.viewId]: viewState};
+      if (!this.props.viewState) {
+        // Apply internal view state
+        this.viewManager.setProps({viewState: this.viewState});
+      }
     }
   }
 
@@ -743,30 +767,60 @@ export default class Deck {
     const pos = event.offsetCenter;
     this._lastPointerDownInfo = this.pickObject({
       x: pos.x,
-      y: pos.y
+      y: pos.y,
+      radius: this.props.pickingRadius
     });
   }
 
-  _onPointerMove(event) {
-    if (event.leftButton || event.rightButton) {
-      // Do not trigger onHover callbacks if mouse button is down.
-      return;
-    }
-    this._requestPick({
-      callback: this.props.onHover,
-      event,
-      mode: 'hover'
-    });
+  _getFrameStats() {
+    const {stats} = this;
+    stats.get('frameRate').timeEnd();
+    stats.get('frameRate').timeStart();
+
+    // Get individual stats from luma.gl so reset works
+    const animationLoopStats = this.animationLoop.stats;
+    stats.get('GPU Time').addTime(animationLoopStats.get('GPU Time').lastTiming);
+    stats.get('CPU Time').addTime(animationLoopStats.get('CPU Time').lastTiming);
   }
 
-  _onPointerLeave(event) {
-    this._requestPick({
-      callback: this.props.onHover,
-      event,
-      mode: 'hover'
-    });
+  _getMetrics() {
+    const {metrics, stats} = this;
+    metrics.fps = stats.get('frameRate').getHz();
+    metrics.setPropsTime = stats.get('setProps Time').time;
+    metrics.updateAttributesTime = stats.get('Update Attributes').time;
+    metrics.framesRedrawn = stats.get('Redraw Count').count;
+    metrics.pickTime =
+      stats.get('pickObject Time').time +
+      stats.get('pickMultipleObjects Time').time +
+      stats.get('pickObjects Time').time;
+    metrics.pickCount = stats.get('Pick Count').count;
+
+    // Luma stats
+    metrics.gpuTime = stats.get('GPU Time').time;
+    metrics.cpuTime = stats.get('CPU Time').time;
+    metrics.gpuTimePerFrame = stats.get('GPU Time').getAverageTime();
+    metrics.cpuTimePerFrame = stats.get('CPU Time').getAverageTime();
+
+    const memoryStats = lumaStats.get('Memory Usage');
+    metrics.bufferMemory = memoryStats.get('Buffer Memory').count;
+    metrics.textureMemory = memoryStats.get('Texture Memory').count;
+    metrics.renderbufferMemory = memoryStats.get('Renderbuffer Memory').count;
+    metrics.gpuMemory = memoryStats.get('GPU Memory').count;
   }
+}
+
+function isIE11() {
+  if (typeof window === undefined) {
+    return false;
+  }
+  const navigator = window.navigator || {};
+  const userAgent = navigator.userAgent || '';
+  return userAgent.indexOf('Trident/') !== -1;
 }
 
 Deck.getPropTypes = getPropTypes;
 Deck.defaultProps = defaultProps;
+
+// This is used to defeat tree shaking of init.js
+// https://github.com/uber/deck.gl/issues/3213
+Deck.VERSION = deckGlobal.VERSION;

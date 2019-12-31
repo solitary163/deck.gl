@@ -18,12 +18,10 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
-import {Layer, createIterable} from '@deck.gl/core';
+import {Layer, project32, gouraudLighting, picking} from '@deck.gl/core';
 import GL from '@luma.gl/constants';
-import {Model, fp64, PhongMaterial} from '@luma.gl/core';
+import {Model} from '@luma.gl/core';
 import ColumnGeometry from './column-geometry';
-const {fp64LowPart} = fp64;
-const defaultMaterial = new PhongMaterial();
 
 import vs from './column-layer-vertex.glsl';
 import fs from './column-layer-fragment.glsl';
@@ -45,7 +43,6 @@ const defaultProps = {
   lineWidthMaxPixels: Number.MAX_SAFE_INTEGER,
 
   extruded: true,
-  fp64: false,
   wireframe: false,
   filled: true,
   stroked: false,
@@ -55,14 +52,13 @@ const defaultProps = {
   getLineColor: {type: 'accessor', value: DEFAULT_COLOR},
   getLineWidth: {type: 'accessor', value: 1},
   getElevation: {type: 'accessor', value: 1000},
-  material: defaultMaterial,
+  material: true,
   getColor: {deprecatedFor: ['getFillColor', 'getLineColor']}
 };
 
 export default class ColumnLayer extends Layer {
   getShaders() {
-    const projectModule = this.use64bitProjection() ? 'project64' : 'project32';
-    return {vs, fs, modules: [projectModule, 'gouraud-lighting', 'picking']};
+    return super.getShaders({vs, fs, modules: [project32, gouraudLighting, picking]});
   }
 
   /**
@@ -75,6 +71,8 @@ export default class ColumnLayer extends Layer {
     attributeManager.addInstanced({
       instancePositions: {
         size: 3,
+        type: GL.DOUBLE,
+        fp64: this.use64bitPositions(),
         transition: true,
         accessor: 'getPosition'
       },
@@ -83,21 +81,18 @@ export default class ColumnLayer extends Layer {
         transition: true,
         accessor: 'getElevation'
       },
-      instancePositions64xyLow: {
-        size: 2,
-        accessor: 'getPosition',
-        update: this.calculateInstancePositions64xyLow
-      },
       instanceFillColors: {
-        size: 4,
+        size: this.props.colorFormat.length,
         type: GL.UNSIGNED_BYTE,
+        normalized: true,
         transition: true,
         accessor: 'getFillColor',
         defaultValue: DEFAULT_COLOR
       },
       instanceLineColors: {
-        size: 4,
+        size: this.props.colorFormat.length,
         type: GL.UNSIGNED_BYTE,
+        normalized: true,
         transition: true,
         accessor: 'getLineColor',
         defaultValue: DEFAULT_COLOR
@@ -114,7 +109,7 @@ export default class ColumnLayer extends Layer {
   updateState({props, oldProps, changeFlags}) {
     super.updateState({props, oldProps, changeFlags});
 
-    const regenerateModels = props.fp64 !== oldProps.fp64;
+    const regenerateModels = changeFlags.extensionsChanged;
 
     if (regenerateModels) {
       const {gl} = this.context;
@@ -164,8 +159,7 @@ export default class ColumnLayer extends Layer {
       gl,
       Object.assign({}, this.getShaders(), {
         id: this.props.id,
-        isInstanced: true,
-        shaderCache: this.context.shaderCache
+        isInstanced: true
       })
     );
   }
@@ -201,8 +195,7 @@ export default class ColumnLayer extends Layer {
     } = this.props;
     const {model, fillVertexCount, wireframeVertexCount, edgeDistance} = this.state;
 
-    const widthMultiplier =
-      lineWidthUnits === 'pixels' ? viewport.distanceScales.metersPerPixel[2] : 1;
+    const widthMultiplier = lineWidthUnits === 'pixels' ? viewport.metersPerPixel : 1;
 
     model.setUniforms(
       Object.assign({}, uniforms, {
@@ -246,27 +239,6 @@ export default class ColumnLayer extends Layer {
         .setDrawMode(GL.TRIANGLE_STRIP)
         .setUniforms({isStroke: true})
         .draw();
-    }
-  }
-
-  calculateInstancePositions64xyLow(attribute, {startRow, endRow}) {
-    const isFP64 = this.use64bitPositions();
-    attribute.constant = !isFP64;
-
-    if (!isFP64) {
-      attribute.value = new Float32Array(2);
-      return;
-    }
-
-    const {data, getPosition} = this.props;
-    const {value, size} = attribute;
-    let i = startRow * size;
-    const {iterable, objectInfo} = createIterable(data, startRow, endRow);
-    for (const object of iterable) {
-      objectInfo.index++;
-      const position = getPosition(object, objectInfo);
-      value[i++] = fp64LowPart(position[0]);
-      value[i++] = fp64LowPart(position[1]);
     }
   }
 }

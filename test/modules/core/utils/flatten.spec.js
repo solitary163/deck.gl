@@ -19,7 +19,7 @@
 // THE SOFTWARE.
 
 import test from 'tape-catch';
-import {flatten, flattenVertices, fillArray} from '@deck.gl/core/utils/flatten';
+import {flatten, fillArray} from '@deck.gl/core/utils/flatten';
 
 const FLATTEN_TEST_CASES = [
   {
@@ -65,14 +65,7 @@ const FILL_ARRAY_TEST_CASES = [
   }
 ];
 
-test('flatten#import', t => {
-  t.ok(typeof flatten === 'function', 'flatten imported OK');
-  t.ok(typeof flattenVertices === 'function', 'flattenVertices imported OK');
-  t.ok(typeof fillArray === 'function', 'fillArray imported OK');
-  t.end();
-});
-
-test('flatten#tests', t => {
+test('flatten', t => {
   for (const tc of FLATTEN_TEST_CASES) {
     t.comment(tc.title + JSON.stringify(tc.opts));
     const result = tc.opts ? flatten(tc.argument, tc.opts) : flatten(tc.argument);
@@ -81,7 +74,7 @@ test('flatten#tests', t => {
   t.end();
 });
 
-test('fillArray#tests', t => {
+test('fillArray', t => {
   for (const tc of FILL_ARRAY_TEST_CASES) {
     const result = fillArray(tc.arguments);
     t.deepEqual(result, tc.result, `fillArray ${tc.title} returned expected result`);

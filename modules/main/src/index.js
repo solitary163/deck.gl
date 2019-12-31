@@ -19,8 +19,6 @@
 // THE SOFTWARE.
 /* eslint-disable max-len */
 
-const experimental = {};
-
 //
 // CORE LIBRARY
 //
@@ -37,9 +35,7 @@ export {
   View,
   MapView,
   FirstPersonView,
-  ThirdPersonView,
   OrbitView,
-  PerspectiveView,
   OrthographicView,
   // Viewports
   Viewport,
@@ -47,62 +43,42 @@ export {
   // Controllers
   Controller,
   MapController,
+  OrbitController,
+  FirstPersonController,
+  OrthographicController,
   // For custom layers
   AttributeManager,
   // Shader modules
+  picking,
   project,
-  project64,
+  project32,
+  gouraudLighting,
+  phongLighting,
+  shadow,
   // Internal classes
   LayerManager,
   DeckRenderer,
   // Logging
   log,
-  // Controllers
-  _OrbitController,
-  _FirstPersonController,
   // Transition bindings
   TRANSITION_EVENTS,
   LinearInterpolator,
   FlyToInterpolator,
   // Effects
   Effect,
-  LightingEffect
+  LightingEffect,
+  PostProcessEffect,
+  // Lights
+  AmbientLight,
+  PointLight,
+  DirectionalLight,
+  // Extension
+  LayerExtension,
+  // Utilities
+  Tesselator,
+  fp64LowPart,
+  createIterable
 } from '@deck.gl/core';
-
-// EXPERIMENTAL CORE LIB CLASSES (May change in minor version bumps, use at your own risk)
-import {experimental as CoreExperimental} from '@deck.gl/core';
-import {experimental as AggregationExperimental} from '@deck.gl/aggregation-layers';
-
-// Experimental Data Accessor Helpers
-// INTERNAL - TODO remove from experimental exports
-const {
-  // For layers
-  count,
-  flattenVertices,
-  fillArray
-} = CoreExperimental;
-
-const {
-  BinSorter,
-  linearScale,
-  getLinearScale,
-  quantizeScale,
-  getQuantizeScale,
-  defaultColorRange
-} = AggregationExperimental;
-
-Object.assign(experimental, {
-  // For layers
-  BinSorter,
-  linearScale,
-  getLinearScale,
-  quantizeScale,
-  getQuantizeScale,
-  defaultColorRange,
-  count,
-  flattenVertices,
-  fillArray
-});
 
 //
 // LAYERS PACKAGES
@@ -126,10 +102,13 @@ export {
 
 export {
   ScreenGridLayer,
-  GridLayer,
+  CPUGridLayer,
   HexagonLayer,
   ContourLayer,
-  _NewGridLayer
+  GridLayer,
+  GPUGridLayer,
+  AGGREGATION_OPERATION,
+  HeatmapLayer
 } from '@deck.gl/aggregation-layers';
 
 export {
@@ -138,7 +117,8 @@ export {
   H3ClusterLayer,
   H3HexagonLayer,
   TileLayer,
-  TripsLayer
+  TripsLayer,
+  Tile3DLayer
 } from '@deck.gl/geo-layers';
 
 export {SimpleMeshLayer, ScenegraphLayer} from '@deck.gl/mesh-layers';
@@ -148,11 +128,3 @@ export {SimpleMeshLayer, ScenegraphLayer} from '@deck.gl/mesh-layers';
 //
 
 export {default, DeckGL} from '@deck.gl/react';
-
-export {AmbientLight, PointLight, DirectionalLight} from '@luma.gl/core';
-
-//
-// EXPERIMENTAL EXPORTS
-//
-
-export {experimental};

@@ -8,6 +8,7 @@ import {default as meterTrajectorySmall} from '../data/meter-trajectory-small.js
 
 import {default as choropleths} from '../data/sf.zip.geo.json';
 export {default as geojson} from '../data/sample.geo.json';
+export {default as geojsonLarge} from '../data/canada.geo.json';
 export {default as hexagons} from '../data/hexagons.json';
 export {default as routes} from '../data/sfmta.routes.json';
 export {default as trips} from '../data/trips.json';
@@ -107,6 +108,29 @@ export const zigzag = [
       [positionOrigin[0] - 0.005, positionOrigin[1] + 0.005],
       [positionOrigin[0] - 0.005, positionOrigin[1] - 0.005]
     ]
+  }
+];
+
+export const zigzag3D = [
+  {
+    // Big zigzag - 3D
+    path: new Array(12)
+      .fill(0)
+      .map((d, i) => [
+        positionOrigin[0] - i * i * 0.001 * (i % 2 ? 1 : -1),
+        positionOrigin[1] + (Math.cos(i * Math.PI) * 0.2) / (i + 4),
+        i * 1000
+      ])
+  },
+  {
+    // Tiny zigzag
+    path: new Array(12)
+      .fill(0)
+      .map((d, i) => [
+        positionOrigin[0] - 0.001 - i * i * 1e-5,
+        positionOrigin[1] + (Math.cos(i * Math.PI) * 2e-3) / (i + 4),
+        i * 10
+      ])
   }
 ];
 
@@ -242,3 +266,19 @@ export function getMultiPointFeatures100K() {
   _multiPointFeatures100K = _multiPointFeatures100K || generateMultiPointFeatures(1e5, 10);
   return _multiPointFeatures100K;
 }
+
+function getMeshSampleData([xCount, yCount], spacing) {
+  const data = [];
+  for (let x = 0; x < xCount; x++) {
+    for (let y = 0; y < yCount; y++) {
+      data.push({
+        position: [(x - (xCount - 1) / 2) * spacing, (y - (yCount - 1) / 2) * spacing],
+        color: [(x / (xCount - 1)) * 255, 128, (y / (yCount - 1)) * 255],
+        orientation: [(x / (xCount - 1)) * 60 - 30, 0, -90]
+      });
+    }
+  }
+  return data;
+}
+
+export const meshSampleData = getMeshSampleData([10, 10], 120);

@@ -8,6 +8,7 @@ import {
   edgeLength,
   UNITS
 } from 'h3-js';
+import {lerp} from 'math.gl';
 import {CompositeLayer, createIterable} from '@deck.gl/core';
 import {ColumnLayer, PolygonLayer} from '@deck.gl/layers';
 
@@ -16,15 +17,9 @@ import {ColumnLayer, PolygonLayer} from '@deck.gl/layers';
 // distortion." Smaller value makes the column layer more sensitive to viewport change.
 const UPDATE_THRESHOLD_KM = 10;
 
-function getHexagonCentroid(getHexagon, object, objectInfo) {
-  const hexagonId = getHexagon(object, objectInfo);
-  const [lat, lng] = h3ToGeo(hexagonId);
-  return [lng, lat];
-}
-
-function h3ToPolygon(hexId) {
-  const vertices = h3ToGeoBoundary(hexId, true);
-  const refLng = vertices[0][0];
+// normalize longitudes w.r.t center (refLng), when not provided first vertex
+export function normalizeLongitudes(vertices, refLng) {
+  refLng = refLng === undefined ? vertices[0][0] : refLng;
   for (const pt of vertices) {
     const deltaLng = pt[0] - refLng;
     if (deltaLng > 180) {
@@ -33,16 +28,76 @@ function h3ToPolygon(hexId) {
       pt[0] += 360;
     }
   }
+}
+
+// scale polygon vertices w.r.t center (hexId)
+export function scalePolygon(hexId, vertices, factor) {
+  const [lat, lng] = h3ToGeo(hexId);
+  const actualCount = vertices.length;
+
+  // normalize with respect to center
+  normalizeLongitudes(vertices, lng);
+
+  // `h3ToGeoBoundary` returns same array object for first and last vertex (closed polygon),
+  // if so skip scaling the last vertex
+  const vertexCount = vertices[0] === vertices[actualCount - 1] ? actualCount - 1 : actualCount;
+  for (let i = 0; i < vertexCount; i++) {
+    vertices[i][0] = lerp(lng, vertices[i][0], factor);
+    vertices[i][1] = lerp(lat, vertices[i][1], factor);
+  }
+}
+
+function getHexagonCentroid(getHexagon, object, objectInfo) {
+  const hexagonId = getHexagon(object, objectInfo);
+  const [lat, lng] = h3ToGeo(hexagonId);
+  return [lng, lat];
+}
+
+function h3ToPolygon(hexId, coverage = 1, flatten) {
+  const vertices = h3ToGeoBoundary(hexId, true);
+
+  if (coverage !== 1) {
+    // scale and normalize vertices w.r.t to center
+    scalePolygon(hexId, vertices, coverage);
+  } else {
+    // normalize w.r.t to start vertex
+    normalizeLongitudes(vertices);
+  }
+
+  if (flatten) {
+    const positions = new Float64Array(vertices.length * 2);
+    let i = 0;
+    for (const pt of vertices) {
+      positions[i++] = pt[0];
+      positions[i++] = pt[1];
+    }
+    return positions;
+  }
+
   return vertices;
+}
+
+function mergeTriggers(getHexagon, coverage) {
+  let trigger;
+  if (getHexagon === undefined || getHexagon === null) {
+    trigger = coverage;
+  } else if (typeof getHexagon === 'object') {
+    trigger = Object.assign({}, getHexagon, {coverage});
+  } else {
+    trigger = {getHexagon, coverage};
+  }
+  return trigger;
 }
 
 const defaultProps = Object.assign({}, PolygonLayer.defaultProps, {
   highPrecision: false,
   coverage: {type: 'number', min: 0, max: 1, value: 1},
   getHexagon: {type: 'accessor', value: x => x.hexagon},
-  extruded: true,
-  getColor: null
+  extruded: true
 });
+
+// not supported
+delete defaultProps.getLineDashArray;
 
 /**
  * A subclass of HexagonLayer that uses H3 hexagonIds in data objects
@@ -83,8 +138,7 @@ export default class H3HexagonLayer extends CompositeLayer {
       this.setState({
         resolution,
         edgeLengthKM: resolution >= 0 ? edgeLength(resolution, UNITS.km) : 0,
-        hasPentagon,
-        vertices: null
+        hasPentagon
       });
     }
 
@@ -112,7 +166,7 @@ export default class H3HexagonLayer extends CompositeLayer {
       return;
     }
 
-    const {pixelsPerMeter} = viewport.distanceScales;
+    const {unitsPerMeter} = viewport.distanceScales;
 
     let vertices = h3ToPolygon(hex);
     const [centerLat, centerLng] = h3ToGeo(hex);
@@ -120,8 +174,8 @@ export default class H3HexagonLayer extends CompositeLayer {
     const [centerX, centerY] = viewport.projectFlat([centerLng, centerLat]);
     vertices = vertices.map(p => {
       const worldPosition = viewport.projectFlat(p);
-      worldPosition[0] = (worldPosition[0] - centerX) / pixelsPerMeter[0];
-      worldPosition[1] = (worldPosition[1] - centerY) / pixelsPerMeter[1];
+      worldPosition[0] = (worldPosition[0] - centerX) / unitsPerMeter[0];
+      worldPosition[1] = (worldPosition[1] - centerY) / unitsPerMeter[1];
       return worldPosition;
     });
 
@@ -135,8 +189,8 @@ export default class H3HexagonLayer extends CompositeLayer {
   _getForwardProps() {
     const {
       elevationScale,
-      fp64,
       material,
+      coverage,
       extruded,
       wireframe,
       stroked,
@@ -145,8 +199,6 @@ export default class H3HexagonLayer extends CompositeLayer {
       lineWidthScale,
       lineWidthMinPixels,
       lineWidthMaxPixels,
-      // TODO - Deprecate getColor Prop in v8.0
-      getColor,
       getFillColor,
       getElevation,
       getLineColor,
@@ -156,8 +208,8 @@ export default class H3HexagonLayer extends CompositeLayer {
 
     return {
       elevationScale,
-      fp64,
       extruded,
+      coverage,
       wireframe,
       stroked,
       filled,
@@ -167,11 +219,11 @@ export default class H3HexagonLayer extends CompositeLayer {
       lineWidthMaxPixels,
       material,
       getElevation,
-      getFillColor: getColor || getFillColor,
+      getFillColor,
       getLineColor,
       getLineWidth,
       updateTriggers: {
-        getFillColor: updateTriggers.getColor || updateTriggers.getFillColor,
+        getFillColor: updateTriggers.getFillColor,
         getElevation: updateTriggers.getElevation,
         getLineColor: updateTriggers.getLineColor,
         getLineWidth: updateTriggers.getLineWidth
@@ -180,11 +232,12 @@ export default class H3HexagonLayer extends CompositeLayer {
   }
 
   _renderPolygonLayer() {
-    const {data, getHexagon, updateTriggers} = this.props;
+    const {data, getHexagon, updateTriggers, coverage} = this.props;
 
     const SubLayerClass = this.getSubLayerClass('hexagon-cell-hifi', PolygonLayer);
     const forwardProps = this._getForwardProps();
-    forwardProps.updateTriggers.getPolygon = updateTriggers.getHexagon;
+
+    forwardProps.updateTriggers.getPolygon = mergeTriggers(updateTriggers.getHexagon, coverage);
 
     return new SubLayerClass(
       forwardProps,
@@ -194,9 +247,11 @@ export default class H3HexagonLayer extends CompositeLayer {
       }),
       {
         data,
+        _normalize: false,
+        positionFormat: 'XY',
         getPolygon: (object, objectInfo) => {
           const hexagonId = getHexagon(object, objectInfo);
-          return h3ToPolygon(hexagonId);
+          return h3ToPolygon(hexagonId, coverage, true);
         }
       }
     );

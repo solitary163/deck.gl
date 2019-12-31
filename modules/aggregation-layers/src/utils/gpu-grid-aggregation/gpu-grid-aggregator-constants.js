@@ -1,30 +1,11 @@
 import GL from '@luma.gl/constants';
-
-// public
-
-export const AGGREGATION_OPERATION = {
-  SUM: 1,
-  MEAN: 2,
-  MIN: 3,
-  MAX: 4
-};
-
-// private
-
-export const DEFAULT_CHANGE_FLAGS = {
-  dataChanged: true,
-  viewportChanged: true,
-  cellSizeChanged: true
-};
+import {AGGREGATION_OPERATION} from '../aggregation-operation-utils';
 
 export const DEFAULT_RUN_PARAMS = {
-  changeFlags: DEFAULT_CHANGE_FLAGS,
   projectPoints: false,
-  useGPU: true,
-  fp64: false,
   viewport: null,
-  gridTransformMatrix: null,
-  createBufferObjects: true
+  createBufferObjects: true,
+  moduleSettings: {}
 };
 
 export const MAX_32_BIT_FLOAT = 3.402823466e38;
@@ -47,6 +28,19 @@ export const DEFAULT_WEIGHT_PARAMS = {
   combineMaxMin: false
 };
 
-export const IDENTITY_MATRIX = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1];
 export const PIXEL_SIZE = 4; // RGBA32F
 export const WEIGHT_SIZE = 3;
+
+export const MAX_MIN_TEXTURE_OPTS = {
+  format: GL.RGBA32F,
+  type: GL.FLOAT,
+  border: 0,
+  mipmaps: false,
+  parameters: {
+    [GL.TEXTURE_MAG_FILTER]: GL.NEAREST,
+    [GL.TEXTURE_MIN_FILTER]: GL.NEAREST
+  },
+  dataFormat: GL.RGBA,
+  width: 1,
+  height: 1
+};

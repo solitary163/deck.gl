@@ -2,7 +2,6 @@
 
 <p class="badges">
   <img src="https://img.shields.io/badge/@deck.gl/layers-lightgrey.svg?style=flat-square" alt="@deck.gl/layers" />
-  <img src="https://img.shields.io/badge/fp64-yes-blue.svg?style=flat-square" alt="64-bit" />
 </p>
 
 # ScatterplotLayer
@@ -68,10 +67,10 @@ new ScatterplotLayer({});
 To use pre-bundled scripts:
 
 ```html
-<script src="https://unpkg.com/@deck.gl@~7.0.0/dist.min.js"></script>
+<script src="https://unpkg.com/deck.gl@^8.0.0/dist.min.js"></script>
 <!-- or -->
-<script src="https://unpkg.com/@deck.gl/core@~7.0.0/dist.min.js"></script>
-<script src="https://unpkg.com/@deck.gl/layers@~7.0.0/dist.min.js"></script>
+<script src="https://unpkg.com/@deck.gl/core@^8.0.0/dist.min.js"></script>
+<script src="https://unpkg.com/@deck.gl/layers@^8.0.0/dist.min.js"></script>
 ```
 
 ```js
@@ -84,19 +83,19 @@ Inherits from all [Base Layer](/docs/api-reference/layer.md) properties.
 
 ### Render Options
 
-##### `radiusScale` (Number, optional)
+##### `radiusScale` (Number, optional) ![transition-enabled](https://img.shields.io/badge/transition-enabled-green.svg?style=flat-square")
 
 * Default: `1`
 
 A global radius multiplier for all points.
 
-##### `lineWidthUnits` (String, optional)
+##### `lineWidthUnits` (String, optional) ![transition-enabled](https://img.shields.io/badge/transition-enabled-green.svg?style=flat-square")
 
 * Default: `'meters'`
 
 The units of the line width, one of `'meters'`, `'pixels'`. When zooming in and out, meter sizes scale with the base map, and pixel sizes remain the same on screen.
 
-##### `lineWidthScale` (Number, optional)
+##### `lineWidthScale` (Number, optional) ![transition-enabled](https://img.shields.io/badge/transition-enabled-green.svg?style=flat-square")
 
 * Default: `1`
 
@@ -114,36 +113,30 @@ Only draw outline of points. It falls back to `outline` if not provided.
 
 Draw the filled area of a point.
 
-##### `radiusMinPixels` (Number, optional)
+##### `radiusMinPixels` (Number, optional) ![transition-enabled](https://img.shields.io/badge/transition-enabled-green.svg?style=flat-square")
 
 * Default: `0`
 
 The minimum radius in pixels. This prop can be used to prevent the circle from getting too small when zoomed out.
 
-##### `radiusMaxPixels` (Number, optional)
+##### `radiusMaxPixels` (Number, optional) ![transition-enabled](https://img.shields.io/badge/transition-enabled-green.svg?style=flat-square")
 
 * Default: `Number.MAX_SAFE_INTEGER`
 
 The maximum radius in pixels. This prop can be used to prevent the circle from getting too big when zoomed in.
 
-##### `lineWidthMinPixels` (Number, optional)
+##### `lineWidthMinPixels` (Number, optional) ![transition-enabled](https://img.shields.io/badge/transition-enabled-green.svg?style=flat-square")
 
 * Default: `0`
 
 The minimum line width in pixels. This prop can be used to prevent the stroke from getting too thin when zoomed out.
 
-##### `lineWidthMaxPixels` (Number, optional)
+##### `lineWidthMaxPixels` (Number, optional) ![transition-enabled](https://img.shields.io/badge/transition-enabled-green.svg?style=flat-square")
 
 * Default: `Number.MAX_SAFE_INTEGER`
 
 The maximum line width in pixels. This prop can be used to prevent the path from getting too thick when zoomed in.
 
-
-##### `fp64` (Boolean, optional)
-
-* Default: `false`
-
-Whether the layer should be rendered in high-precision 64-bit mode. Note that since deck.gl v6.1, the default 32-bit projection uses a hybrid mode that matches 64-bit precision with significantly better performance.
 
 ### Data Accessors
 
@@ -166,7 +159,7 @@ The radius of each object, in meters.
 
 * Default: `[0, 0, 0, 255]`
 
-The rgba color of each object, in `r, g, b, [a]`. Each component is in the 0-255 range.
+The rgba color is in the format of `[r, g, b, [a]]`. Each channel is a number between 0-255 and `a` is 255 if not supplied.
 
 * If an array is provided, it is used as the color for all objects.
 * If a function is provided, it is called on each object to retrieve its color.
@@ -177,7 +170,7 @@ It will be overridden by `getLineColor` and `getFillColor` if these new accessor
 
 * Default: `[0, 0, 0, 255]`
 
-The rgba color of each object, in `r, g, b, [a]`. Each component is in the 0-255 range.
+The rgba color is in the format of `[r, g, b, [a]]`. Each channel is a number between 0-255 and `a` is 255 if not supplied.
 
 * If an array is provided, it is used as the filled color for all objects.
 * If a function is provided, it is called on each object to retrieve its color.
@@ -187,7 +180,7 @@ The rgba color of each object, in `r, g, b, [a]`. Each component is in the 0-255
 
 * Default: `[0, 0, 0, 255]`
 
-The rgba color of each object, in `r, g, b, [a]`. Each component is in the 0-255 range.
+The rgba color is in the format of `[r, g, b, [a]]`. Each channel is a number between 0-255 and `a` is 255 if not supplied.
 
 * If an array is provided, it is used as the outline color for all objects.
 * If a function is provided, it is called on each object to retrieve its color.
@@ -206,4 +199,3 @@ The width of the outline of each object, in units specified by `lineWidthUnits` 
 ## Source
 
 [modules/layers/src/scatterplot-layer](https://github.com/uber/deck.gl/tree/master/modules/layers/src/scatterplot-layer)
-

@@ -1,19 +1,17 @@
 // prettier-ignore
 module.exports = {
   plugins: ['react'],
+  parser: 'babel-eslint',
   extends: ['uber-jsx', 'uber-es2015', 'prettier', 'prettier/react', 'plugin:import/errors'],
-  overrides: {
+  overrides: [{
     files: ['*.spec.js', 'webpack.config.js', '**/bundle/*.js'],
     rules: {
       'import/no-extraneous-dependencies': 0
     }
-  },
+  }],
   settings: {
     'import/core-modules': [
-      '@luma.gl/core',
-      '@luma.gl/constants',
-      'math.gl',
-      'viewport-mercator-project'
+      'deck.gl'
     ]
   },
   rules: {

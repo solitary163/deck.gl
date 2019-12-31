@@ -2,7 +2,6 @@
 
 <p class="badges">
   <img src="https://img.shields.io/badge/@deck.gl/layers-lightgrey.svg?style=flat-square" alt="@deck.gl/layers" />
-  <img src="https://img.shields.io/badge/fp64-yes-blue.svg?style=flat-square" alt="64-bit" />
 </p>
 
 # BitmapLayer
@@ -44,10 +43,10 @@ new BitmapLayer({});
 To use pre-bundled scripts:
 
 ```html
-<script src="https://unpkg.com/@deck.gl@~7.0.0/dist.min.js"></script>
+<script src="https://unpkg.com/deck.gl@^8.0.0/dist.min.js"></script>
 <!-- or -->
-<script src="https://unpkg.com/@deck.gl/core@~7.0.0/dist.min.js"></script>
-<script src="https://unpkg.com/@deck.gl/layers@~7.0.0/dist.min.js"></script>
+<script src="https://unpkg.com/@deck.gl/core@^8.0.0/dist.min.js"></script>
+<script src="https://unpkg.com/@deck.gl/layers@^8.0.0/dist.min.js"></script>
 ```
 
 ```js
@@ -59,7 +58,7 @@ new deck.BitmapLayer({});
 
 ### Data
 
-##### `bitmap` (String|Texture2D|Image|HTMLCanvasElement)
+##### `bitmap` (String|Texture2D|Image|HTMLCanvasElement|HTMLVideoElement)
 
 - Default `null`.
 
@@ -74,19 +73,19 @@ Supported formats:
 
 ### Render Options
 
-##### `desaturate` (Number)
+##### `desaturate` (Number) ![transition-enabled](https://img.shields.io/badge/transition-enabled-green.svg?style=flat-square")
 
 - Default `0`
 
 The desaturation of the bitmap. Between `[0, 1]`. `0` being the original color and `1` being grayscale.
 
-##### `transparentColor` (Array)
+##### `transparentColor` (Array) ![transition-enabled](https://img.shields.io/badge/transition-enabled-green.svg?style=flat-square")
 
 - Default `[0, 0, 0, 0]`
 
 The color to use for transparent pixels, in `[r, g, b, a]`. Each component is in the `[0, 255]` range.
 
-##### `tintColor` (Array)
+##### `tintColor` (Array) ![transition-enabled](https://img.shields.io/badge/transition-enabled-green.svg?style=flat-square")
 
 - Default `[255, 255, 255]`
 

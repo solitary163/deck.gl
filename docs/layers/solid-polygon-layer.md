@@ -1,6 +1,5 @@
 <p class="badges">
   <img src="https://img.shields.io/badge/@deck.gl/layers-lightgrey.svg?style=flat-square" alt="@deck.gl/layers" />
-  <img src="https://img.shields.io/badge/fp64-yes-blue.svg?style=flat-square" alt="64-bit" />
   <img src="https://img.shields.io/badge/lighting-yes-blue.svg?style=flat-square" alt="lighting" />
 </p>
 
@@ -45,10 +44,10 @@ new SolidPolygonLayer({});
 To use pre-bundled scripts:
 
 ```html
-<script src="https://unpkg.com/@deck.gl@~7.0.0/dist.min.js"></script>
+<script src="https://unpkg.com/deck.gl@^8.0.0/dist.min.js"></script>
 <!-- or -->
-<script src="https://unpkg.com/@deck.gl/core@~7.0.0/dist.min.js"></script>
-<script src="https://unpkg.com/@deck.gl/layers@~7.0.0/dist.min.js"></script>
+<script src="https://unpkg.com/@deck.gl/core@^8.0.0/dist.min.js"></script>
+<script src="https://unpkg.com/@deck.gl/layers@^8.0.0/dist.min.js"></script>
 ```
 
 ```js
@@ -84,19 +83,13 @@ Whether to generate a line wireframe of the hexagon. The outline will have
 "horizontal" lines closing the top and bottom polygons and a vertical line
 (a "strut") for each vertex on the polygon.
 
-##### `elevationScale` (Number, optional)
+##### `elevationScale` (Number, optional) ![transition-enabled](https://img.shields.io/badge/transition-enabled-green.svg?style=flat-square")
 
 * Default: `1`
 
 Elevation multiplier. The final elevation is calculated by
   `elevationScale * getElevation(d)`. `elevationScale` is a handy property to scale
 all elevation without updating the data.
-
-##### `fp64` (Boolean, optional)
-
-* Default: `false`
-
-Whether the layer should be rendered in high-precision 64-bit mode. Note that since deck.gl v6.1, the default 32-bit projection uses a hybrid mode that matches 64-bit precision with significantly better performance.
 
 **Remarks:**
 
@@ -106,10 +99,20 @@ Whether the layer should be rendered in high-precision 64-bit mode. Note that si
 
 ##### `material` (Object, optional)
 
-* Default: `new PhongMaterial()`
+* Default: `true`
 
 This is an object that contains material props for [lighting effect](/docs/effects/lighting-effect.md) applied on extruded polygons.
-Check [PhongMaterial](https://github.com/uber/luma.gl/tree/7.0-release/docs/api-reference/core/materials/phong-material.md) for more details.
+Check [the lighting guide](/docs/developer-guide/using-lighting.md#constructing-a-material-instance) for configurable settings.
+
+##### `_normalize` (Object, optional)
+
+* Default: `true`
+
+> Note: This prop is experimental
+
+If `false`, will skip normalizing the coordinates returned by `getPolygon`. Disabling normalization improves performance during data update, but makes the layer prone to error in case the data is malformed. It is only recommended when you use this layer with preprocessed static data or validation on the backend.
+
+When normalization is disabled, polygons must be specified in the format of flat array or `{positions, holeIndices}`. Rings must be closed (i.e. the first and last vertices must be identical). See `getPolygon` below for details.
 
 ### Data Accessors
 
@@ -133,7 +136,7 @@ A polygon can be one of the following formats:
 
 * Default: `[0, 0, 0, 255]`
 
-The rgba fill color of each object's polygon, in `r, g, b, [a]`. Each component is in the 0-255 range.
+The rgba color is in the format of `[r, g, b, [a]]`. Each channel is a number between 0-255 and `a` is 255 if not supplied.
 
 * If an array is provided, it is used as the fill color for all polygons.
 * If a function is provided, it is called on each polygon to retrieve its fill color.
@@ -142,7 +145,7 @@ The rgba fill color of each object's polygon, in `r, g, b, [a]`. Each component 
 
 * Default: `[0, 0, 0, 255]`
 
-The rgba wireframe color of each object's polygon, in `r, g, b, [a]`. Each component is in the 0-255 range.
+The rgba color is in the format of `[r, g, b, [a]]`. Each channel is a number between 0-255 and `a` is 255 if not supplied.
 Only applies if `extruded: true`.
 
 * If an array is provided, it is used as the stroke color for all polygons.
@@ -152,13 +155,76 @@ Only applies if `extruded: true`.
 
 * Default: `1000`
 
-The elevation to extrude each polygon with. 
+The elevation to extrude each polygon with.
 If a cartographic projection mode is used, height will be interpreted as meters,
 otherwise will be in unit coordinates.
 Only applies if `extruded: true`.
 
 * If a number is provided, it is used as the elevation for all polygons.
 * If a function is provided, it is called on each object to retrieve its elevation.
+
+
+## Use binary attributes
+
+This section is about the special requirements when [supplying attributes directly](/docs/developer-guide/performance.md#supply-attributes-directly) to a `SolidPolygonLayer`.
+
+Because each polygon has a different number of vertices, when `data.attributes.getPolygon` is supplied, the layer also requires an array `data.startIndices` that describes the vertex index at the start of each polygon. For example, if there are 3 polygons of 3, 4, and 5 vertices each (including the end vertex that overlaps with the first vertex to close the loop), `startIndices` should be `[0, 3, 7, 12]`. *Polygons with holes are not supported when using precalculated attributes.*
+
+Additionally, all other attributes (`getFillColor`, `getElevation`, etc.), if supplied, must contain the same layout (number of vertices) as the `getPolygon` buffer.
+
+To truly realize the performance gain from using binary data, the app likely wants to skip all data processing in this layer. Specify the `_normalize` prop to skip normalization.
+
+Example use case:
+
+```js
+// USE PLAIN JSON OBJECTS
+const POLYGON_DATA = [
+  {
+     contour: [[-122.4, 37.7], [-122.4, 37.8], [-122.5, 37.8], [-122.5, 37.7], [-122.4, 37.7]],
+     population: 26599
+  },
+  ...
+];
+
+new SolidPolygonLayer({
+  data: POLYGON_DATA,
+  getPolygon: d => d.contour,
+  getElevation: d => d.population,
+  getFillColor: [0, 100, 60, 160]
+})
+```
+
+Convert to using binary attributes:
+
+```js
+// USE BINARY
+// Flatten the polygon vertices
+// [-122.4, 37.7, -122.4, 37.8, -122.5, 37.8, -122.5, 37.7, -122.4, 37.7, ...]
+const positions = new Float64Array(POLYGON_DATA.map(d => d.contour).flat(2));
+// The color attribute must supply one color for each vertex
+// [255, 0, 0, 255, 0, 0, 255, 0, 0, ...]
+const elevations = new Uint8Array(POLYGON_DATA.map(d => d.contour.map(_ => d.population)).flat());
+// The "layout" that tells PathLayer where each path starts
+const startIndices = new Uint16Array(POLYGON_DATA.reduce((acc, d) => {
+  const lastIndex = acc[acc.length - 1];
+  acc.push(lastIndex + d.contour.length);
+  return acc;
+}, [0]));
+
+new SolidPolygonLayer({
+  data: {
+    length: POLYGON_DATA.length,
+    startIndices: startIndices, // this is required to render the paths correctly!
+    attributes: {
+      getPolygon: {value: positions, size: 2},
+      getElevation: {value: elevations, size: 1}
+    }
+  },
+  _normalize: false, // this instructs the layer to skip normalization and use the binary as-is
+  getFillColor: [0, 100, 60, 160]
+})
+```
+
 
 ## Remarks
 
@@ -167,9 +233,8 @@ Only applies if `extruded: true`.
 * Polygons are always closed, i.e. there is an implicit line segment between
   the first and last vertices, when those vertices are not equal.
 * The specification of complex polygons intentionally follows the GeoJson
-  conventions for representing polugons with holes.
+  conventions for representing polygons with holes.
 
 ## Source
 
 [modules/layers/src/solid-polygon-layer](https://github.com/uber/deck.gl/tree/master/modules/layers/src/solid-polygon-layer)
-
